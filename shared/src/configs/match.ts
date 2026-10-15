@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { MAPS } from './maps';
 import type { MatchConfig } from '../types';
 export const DEFAULT_CONFIG: MatchConfig = {
+  combatFlow: 'simultaneous',
   mode: 'ffa',
   maxPlayers: 4,
   teams: 2,
@@ -20,6 +21,7 @@ export const DEFAULT_CONFIG: MatchConfig = {
 };
 export const configSchema = z
   .object({
+    combatFlow: z.enum(['simultaneous', 'turns']).default('simultaneous'),
     mode: z.enum(['ffa', 'teams']),
     maxPlayers: z.number().int().min(2).max(8),
     teams: z.number().int().min(2).max(4),
@@ -44,6 +46,18 @@ export const configSchema = z
       ctx.addIssue({ code: 'custom', message: 'Leave at least one slot for a human.' });
   });
 export const commandSchema = z.discriminatedUnion('type', [
+  z
+    .object({
+      type: z.literal('lock'),
+      round: z.number().int().min(1),
+      angle: z.number().min(5).max(175),
+      power: z.number().min(10).max(100),
+      weapon: z.string().max(24),
+      ability: z.boolean(),
+      targetId: z.string().max(60).optional(),
+      pass: z.boolean().optional(),
+    })
+    .strict(),
   z
     .object({
       type: z.literal('move'),

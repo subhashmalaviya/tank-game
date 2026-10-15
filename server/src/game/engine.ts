@@ -4,6 +4,7 @@ import { MAPS, mapById } from '../../../shared/src/configs/maps';
 import { WEAPONS } from '../../../shared/src/configs/weapons';
 import { activateAbility, enemy } from '../../../shared/src/abilities/abilities';
 import { generateMap, HEIGHT, WIDTH, Terrain, random } from '../../../shared/src/maps/terrain';
+import { coverAt } from '../../../shared/src/maps/environment';
 import { projectile } from '../../../shared/src/physics/projectile';
 import type {
   Command,
@@ -52,10 +53,9 @@ export class Game {
         statuses: {},
         moved: 0,
         weapons: Object.fromEntries(
-          [...new Set([def.weapon, 'standard', 'bouncing', 'guided'])].map((id) => [
-            id,
-            { ammo: WEAPONS[id].ammo, cooldown: 0 },
-          ]),
+          [...new Set([def.weapon, 'standard', 'bouncing', 'guided', 'ice', 'incendiary'])].map(
+            (id) => [id, { ammo: WEAPONS[id].ammo, cooldown: 0 }],
+          ),
         ),
         stats: { damage: 0, shots: 0, hits: 0, kills: 0 },
         angle: i < players.length / 2 ? 45 : 135,
@@ -86,6 +86,7 @@ export class Game {
     return this.state.fighters.find((t) => t.id === this.state.activeId)!;
   }
   action(playerId: string, command: Command, now = Date.now()) {
+    if (command.type === 'lock') throw new Error('This room uses classic turns.');
     if (this.state.result) throw new Error('Match has ended.');
     if (this.state.activeId !== playerId) throw new Error('Wait for your turn.');
     if (this.state.resolveAt) throw new Error('A shot is still resolving.');
@@ -106,7 +107,12 @@ export class Game {
           )
         )
           break;
-        if (x < 24 || x > WIDTH - 24) break;
+        if (
+          x < 24 ||
+          x > WIDTH - 24 ||
+          coverAt(this.state.environment, x + command.direction * 20, a.y)
+        )
+          break;
         const y = this.terrain.surface(x, Math.max(0, a.y - 16)) - 12;
         if (y < a.y - 20 || y > HEIGHT) break;
         a.x = x;
@@ -116,9 +122,19 @@ export class Game {
       a.moved = Math.min(max, a.moved + traveled);
       if (!traveled) throw new Error('Terrain blocks movement.');
       if (mapById(this.state.map).slippery) {
-        const x = a.x + command.direction * 4;
+        const drift = Math.min(4, max - a.moved);
+        const x = a.x + command.direction * drift;
         const y = this.terrain.surface(x) - 12;
-        if (x > 24 && x < WIDTH - 24 && Math.abs(y - a.y) < 24) {
+        if (
+          x > 24 &&
+          x < WIDTH - 24 &&
+          Math.abs(y - a.y) < 24 &&
+          !coverAt(this.state.environment, x + command.direction * 20, y) &&
+          !this.state.fighters.some(
+            (t) => t.id !== a.id && t.hp > 0 && Math.abs(t.x - x) < 38 && Math.abs(t.y - y) < 30,
+          )
+        ) {
+          a.moved += drift;
           a.x = x;
           a.y = y;
         }
@@ -147,9 +163,14 @@ export class Game {
       this.nextTurn(now);
       return;
     }
-    const weapon = WEAPONS[command.weapon],
+    const weapon = { ...WEAPONS[command.weapon] },
       inventory = a.weapons[command.weapon];
-    if (!weapon || !inventory) throw new Error('Weapon is not equipped.');
+    if (
+      !Object.hasOwn(WEAPONS, command.weapon) ||
+      !Object.hasOwn(a.weapons, command.weapon) ||
+      !inventory
+    )
+      throw new Error('Weapon is not equipped.');
     if (inventory.ammo === 0) throw new Error('No ammunition left.');
     if (inventory.cooldown > 0) throw new Error('Weapon is cooling down.');
     if (inventory.ammo > 0) inventory.ammo--;
@@ -158,8 +179,10 @@ export class Game {
     a.power = command.power;
     delete a.statuses.cloak;
     const boost = !!a.statuses.overcharge,
-      count = a.tank === 'viper' && boost ? 5 : weapon.projectiles,
+      count = a.tank === 'viper' && a.statuses.hunter ? 5 : weapon.projectiles,
       multiplier = a.tank === 'nova' && boost ? 1.65 : 1;
+    if (a.tank === 'viper' && a.statuses.hunter) weapon.behavior = 'guided';
+    delete a.statuses.hunter;
     delete a.statuses.overcharge;
     a.stats.shots++;
     let hit = false;
@@ -179,6 +202,10 @@ export class Game {
       const shot: Shot = {
         weapon: weapon.id,
         owner: a.id,
+        hit: flight.hit,
+        terrainRadius: weapon.terrain,
+        launchMs: (weapon.chargeMs ?? 180) + i * (weapon.launchGapMs ?? 110),
+        impactMs: (weapon.chargeMs ?? 180) + i * (weapon.launchGapMs ?? 110) + flight.durationMs,
         path: flight.path,
         impact: flight.impact,
         radius: flight.hit ? weapon.radius : 0,
@@ -244,7 +271,8 @@ export class Game {
     this.settle(a);
     this.state.shots = shots;
     this.state.terrain = this.terrain.pack();
-    this.state.resolveAt = now + 2400;
+    this.state.resolutionStartedAt = now;
+    this.state.resolveAt = now + Math.max(2400, ...shots.map((s) => s.impactMs! + 750));
     this.state.message = `${a.name} fired ${weapon.name}`;
     this.touch();
   }
@@ -260,7 +288,12 @@ export class Game {
     if (target.hp <= 0) return 0;
     let amount = Math.max(
       0,
-      Math.round(raw * (pierce ? 1 : 1 - target.armor) * (target.statuses.fortify ? 0.45 : 1)),
+      Math.round(
+        raw *
+          (pierce ? 1 : 1 - target.armor) *
+          (target.statuses.fortify ? 0.45 : 1) *
+          (target.statuses.phase ? 0.35 : 1),
+      ),
     );
     if (target.statuses.shield) {
       const absorb = Math.min(target.statuses.shield, amount);
@@ -303,6 +336,7 @@ export class Game {
         if (value! <= 1) delete ending.statuses[status as keyof typeof ending.statuses];
         else ending.statuses[status as keyof typeof ending.statuses] = value! - 1;
       }
+    if (!ending.statuses.shieldTurns) delete ending.statuses.shield;
     if (this.checkWin(now)) return;
     const fs = this.state.fighters,
       current = fs.indexOf(this.actor);

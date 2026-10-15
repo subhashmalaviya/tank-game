@@ -1,3 +1,5 @@
+import { coverAt } from '../maps/environment';
+import type { Environment } from '../types';
 import { HEIGHT, WIDTH, Terrain } from '../maps/terrain';
 import type { Fighter, Point, Weapon } from '../types';
 export interface Flight {
@@ -5,6 +7,8 @@ export interface Flight {
   impact: Point;
   directId?: string;
   hit: boolean;
+  durationMs: number;
+  coverId?: string;
 }
 export function projectile(
   origin: Point,
@@ -16,6 +20,7 @@ export function projectile(
   fighters: Fighter[],
   ownerId: string,
   teamMode = false,
+  environment?: Environment,
 ): Flight {
   const rad = (angle * Math.PI) / 180,
     speed = (weapon.speed * power) / 100;
@@ -43,7 +48,12 @@ export function projectile(
       }
     }
     // Alien maps contain a low-gravity central field.
-    const g = gravity * (gravity === 165 && x > 500 && x < 940 ? 0.6 : 1) * weapon.gravity;
+    vx += (environment?.wind ?? 0) / 60;
+    const zone = environment?.gravityZones.find((z) => x >= z.from && x <= z.to);
+    const g =
+      gravity *
+      (zone?.multiplier ?? (environment ? 1 : gravity === 165 && x > 500 && x < 940 ? 0.6 : 1)) *
+      weapon.gravity;
     vy += g / 60;
     const nx = x + vx / 60,
       ny = y + vy / 60,
@@ -61,7 +71,24 @@ export function projectile(
       );
       if (target) {
         path.push({ x: px, y: py });
-        return { path, impact: { x: px, y: py }, directId: target.id, hit: true };
+        return {
+          path,
+          impact: { x: px, y: py },
+          directId: target.id,
+          hit: true,
+          durationMs: ((i + 1) * 1000) / 60,
+        };
+      }
+      const cover = coverAt(environment, px, py);
+      if (cover) {
+        path.push({ x: px, y: py });
+        return {
+          path,
+          impact: { x: px, y: py },
+          hit: true,
+          coverId: cover.id,
+          durationMs: ((i + 1) * 1000) / 60,
+        };
       }
       if (terrain.solid(px, py)) {
         if (weapon.behavior === 'bounce' && bounces < 2) {
@@ -79,7 +106,7 @@ export function projectile(
           continue;
         }
         path.push({ x: px, y: py });
-        return { path, impact: { x: px, y: py }, hit: true };
+        return { path, impact: { x: px, y: py }, hit: true, durationMs: ((i + 1) * 1000) / 60 };
       }
     }
     if (bounced) continue;
@@ -88,10 +115,10 @@ export function projectile(
     if (i % 3 === 0) path.push({ x, y });
     if (x < -80 || x > WIDTH + 80 || y > HEIGHT + 80) {
       path.push({ x, y });
-      return { path, impact: { x, y }, hit: false };
+      return { path, impact: { x, y }, hit: false, durationMs: path.length * 50 };
     }
   }
-  return { path, impact: { x, y }, hit: false };
+  return { path, impact: { x, y }, hit: false, durationMs: path.length * 50 };
 }
 export function preview(
   origin: Point,

@@ -27,7 +27,7 @@ describe('Phase 1: playable artillery loop', () => {
     expect(g.state.shots[0].path.length).toBeGreaterThan(3);
     expect(g.state.terrain.join(',')).not.toBe(before);
     expect(g.state.resolveAt).toBeGreaterThan(1001);
-    g.tick(4000);
+    g.tick(g.state.resolveAt + 1);
     expect(g.state.activeId).toBe('p1');
   });
   it('validates turns, motion budget and shot resolution lock', () => {
@@ -73,11 +73,12 @@ describe('Phase 2: all tanks and weapons', () => {
       expect(a.cooldown).toBeGreaterThan(0);
       expect(() => g.action(a.id, { type: 'ability' }, 1002)).toThrow('cooling');
       if (id === 'titan') expect(a.statuses.fortify).toBe(2);
-      if (id === 'phantom') expect(a.statuses.cloak).toBe(2);
+      if (id === 'phantom') expect(a.statuses.phase).toBe(2);
       if (id === 'volt') expect(b.statuses.emp).toBe(2);
       if (id === 'inferno') expect(g.state.hazards.some((h) => h.kind === 'fire')).toBe(true);
       if (id === 'frostbite') expect(b.statuses.freeze).toBe(2);
-      if (id === 'viper' || id === 'nova') expect(a.statuses.overcharge).toBe(3);
+      if (id === 'viper') expect(a.statuses.hunter).toBe(3);
+      if (id === 'nova') expect(a.statuses.overcharge).toBe(3);
       if (id === 'bastion') expect(a.statuses.shield).toBe(40);
       if (id === 'medic') expect(a.hp).toBe(a.maxHp - 9);
       if (id === 'quake') expect(b.hp).toBeLessThan(b.maxHp);

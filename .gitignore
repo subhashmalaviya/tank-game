@@ -13,3 +13,6 @@ playwright-report/
 .vercel/
 .DS_Store
 
+
+checkpoints/
+Tank Game UI Layout Specification.png

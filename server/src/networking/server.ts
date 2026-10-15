@@ -83,7 +83,9 @@ export async function createArena(
     res.setHeader('X-Frame-Options', 'DENY');
     next();
   });
-  app.get('/api/health', (_req, res) => res.json({ ok: true, rooms: rooms.rooms.size }));
+  app.get('/api/health', (_req, res) =>
+    res.json({ ok: true, rooms: rooms.rooms.size, protocol: 2, build: 'simultaneous-overlays-v2' }),
+  );
   const credentials = z.object({ name: nameSchema, password: z.string().min(8).max(128) }).strict();
   for (const action of ['register', 'login'] as const)
     app.post('/api/auth/' + action, async (req, res) => {

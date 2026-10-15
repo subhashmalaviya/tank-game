@@ -21,8 +21,8 @@ export const ABILITIES: Record<string, Ability> = {
   },
   phantom: {
     apply: ({ actor }) => {
-      actor.statuses.cloak = 2;
-      return 'Cloaking field engaged';
+      actor.statuses.phase = 2;
+      return 'Phase shift engaged: 65% damage reduction';
     },
   },
   volt: {
@@ -55,8 +55,8 @@ export const ABILITIES: Record<string, Ability> = {
   },
   viper: {
     apply: ({ actor }) => {
-      actor.statuses.overcharge = 3;
-      return 'Five-missile barrage armed';
+      actor.statuses.hunter = 3;
+      return 'Hunter lock: five guided missiles armed';
     },
   },
   bastion: {
@@ -66,8 +66,10 @@ export const ABILITIES: Record<string, Ability> = {
           t.hp > 0 &&
           (t.id === actor.id || (teamMode && t.team === actor.team)) &&
           Math.abs(t.x - actor.x) < 220
-        )
+        ) {
           t.statuses.shield = 40;
+          t.statuses.shieldTurns = 3;
+        }
       return 'Energy shields online';
     },
   },
@@ -75,9 +77,22 @@ export const ABILITIES: Record<string, Ability> = {
     apply: ({ actor, fighters, teamMode, crater, damage }) => {
       const t = nearest(actor, fighters, teamMode, 420);
       if (!t) throw new Error('No enemy within 420m. Move closer first.');
-      crater(t.x, t.y + 22, 100);
-      damage(t, 18);
-      return 'Earthshaker rupture';
+      const direction = Math.sign(t.x - actor.x);
+      for (let d = 60; d <= Math.abs(t.x - actor.x); d += 60)
+        crater(
+          actor.x + direction * d,
+          actor.y + 22 + ((t.y - actor.y) * d) / Math.abs(t.x - actor.x),
+          45,
+        );
+      crater(t.x, t.y + 22, 85);
+      for (const target of fighters)
+        if (
+          enemy(actor, target, teamMode) &&
+          Math.sign(target.x - actor.x) === direction &&
+          Math.abs(target.x - actor.x) <= Math.abs(t.x - actor.x) + 40
+        )
+          damage(target, 18);
+      return 'Directional fault line rupture';
     },
   },
   medic: {

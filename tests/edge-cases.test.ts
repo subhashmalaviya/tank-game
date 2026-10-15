@@ -124,8 +124,9 @@ describe('Weapon behavior and combat edge cases', () => {
     const game = g();
     game.action('a', { type: 'fire', weapon: 'guided', angle: 45, power: 50 }, 1001);
     expect(game.actor.weapons.guided.ammo).toBe(1);
-    game.tick(4000);
-    game.action('b', { type: 'pass' }, 4001);
+    const resolved = game.state.resolveAt + 1;
+    game.tick(resolved);
+    game.action('b', { type: 'pass' }, resolved + 1);
     expect(game.actor.weapons.guided.cooldown).toBe(2);
     expect(game.actor.weapons.guided.ammo).toBe(1);
   });

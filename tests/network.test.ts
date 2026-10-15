@@ -31,7 +31,7 @@ async function makePair() {
 async function start(
   a: Socket,
   b: Socket,
-  config = { ...DEFAULT_CONFIG, maxPlayers: 2, map: 'desert' },
+  config = { ...DEFAULT_CONFIG, combatFlow: 'turns', maxPlayers: 2, map: 'desert' },
 ) {
   expect((await req(a, 'configure', config)).ok).toBe(true);
   await req(a, 'ready', true);
@@ -48,12 +48,76 @@ afterAll(async () => {
   await arena.close();
 });
 describe('Actual Socket.IO multiplayer integration', () => {
+  it('keeps simultaneous plans private across actual clients, reconnects, and isolated rooms', async () => {
+    const p = await makePair(),
+      q = await makePair();
+    await start(p.a, p.b, {
+      ...DEFAULT_CONFIG,
+      combatFlow: 'simultaneous',
+      maxPlayers: 2,
+      map: 'desert',
+    });
+    await start(q.a, q.b, {
+      ...DEFAULT_CONFIG,
+      combatFlow: 'simultaneous',
+      maxPlayers: 2,
+      map: 'desert',
+    });
+    const game = arena.rooms.get(p.ar.room!.code).game!,
+      other = arena.rooms.get(q.ar.room!.code).game!;
+    const before = JSON.stringify(other.state);
+    let snapshot: RoomState | undefined;
+    p.b.on('state', (s) => (snapshot = s));
+    const submit = await req(p.a, 'command', {
+      id: 'sealed-a',
+      command: { type: 'lock', round: 1, angle: 47, power: 63, weapon: 'standard', ability: false },
+    });
+    expect(submit.ok).toBe(true);
+    await sleep(40);
+    expect(snapshot!.match!.ownPlan).toBeUndefined();
+    expect(snapshot!.match!.fighters.find((f) => f.id === p.ar.playerId)!.power).toBe(0);
+    expect(snapshot!.match!.shots).toHaveLength(0);
+    const reconnect = await client(),
+      resumed = await req(reconnect, 'resume', { code: p.ar.room!.code, token: p.ar.token });
+    expect(resumed.room!.match!.ownPlan?.power).toBe(63);
+    expect(
+      (
+        await req(reconnect, 'command', {
+          id: 'illegal-edit',
+          command: { type: 'move', direction: 1, distance: 2 },
+        })
+      ).ok,
+    ).toBe(false);
+    expect(
+      (
+        await req(p.b, 'command', {
+          id: 'sealed-b',
+          command: {
+            type: 'lock',
+            round: 1,
+            angle: 133,
+            power: 63,
+            weapon: 'standard',
+            ability: false,
+          },
+        })
+      ).ok,
+    ).toBe(true);
+    expect(game.state.phase).toBe('resolving');
+    expect(new Set(game.state.shots.map((s) => s.owner)).size).toBe(2);
+    expect(JSON.stringify(other.state)).toBe(before);
+    game.tick(game.state.resolveAt + 1);
+    expect(game.state.turn).toBe(2);
+    expect(game.state.readyIds).toEqual([]);
+  });
   it('creates a coded room, joins friends and hides private tokens', async () => {
     const { a, ar, br } = await makePair();
     expect(ar.room!.code).toMatch(/^[A-Z2-9]{6}$/);
     expect(br.room!.players).toHaveLength(2);
     expect(JSON.stringify(br.room)).not.toContain(ar.token);
-    expect((await req(a, 'configure', { ...DEFAULT_CONFIG, maxPlayers: 9 })).ok).toBe(false);
+    expect(
+      (await req(a, 'configure', { ...DEFAULT_CONFIG, combatFlow: 'turns', maxPlayers: 9 })).ok,
+    ).toBe(false);
   });
   it('validates password, host authority, readiness and balanced teams', async () => {
     const a = await client(),
@@ -164,7 +228,7 @@ describe('Actual Socket.IO multiplayer integration', () => {
     for (let i = 0; i < 70 && !g.state.result; i++) {
       g.state.deadline = now + 30000;
       g.botTurn(now);
-      now += 2500;
+      now = Math.max(now + 2500, g.state.resolveAt + 1);
       g.tick(now);
     }
     expect(g.state.result).not.toBeNull();
@@ -179,7 +243,12 @@ describe('Actual Socket.IO multiplayer integration', () => {
   it.each([2, 3, 4, 5, 6, 7, 8])('starts a %i-player free-for-all', async (n) => {
     const a = await client(),
       r = await req(a, 'create', { name: 'FFA' });
-    await req(a, 'configure', { ...DEFAULT_CONFIG, maxPlayers: n, bots: n - 1 });
+    await req(a, 'configure', {
+      ...DEFAULT_CONFIG,
+      combatFlow: 'turns',
+      maxPlayers: n,
+      bots: n - 1,
+    });
     await req(a, 'ready', true);
     expect((await req(a, 'start')).ok).toBe(true);
     expect(arena.rooms.get(r.room!.code).game!.state.fighters).toHaveLength(n);
@@ -217,13 +286,14 @@ describe('Actual Socket.IO multiplayer integration', () => {
     expect(r2.room!.phase).toBe('battle');
     expect(r2.room!.players.every((p) => !p.bot)).toBe(true);
   });
-  it('cloaked positions are filtered for opponents', async () => {
+  it('phase shift is a public defensive status, with coordinates visible', async () => {
     const p = await makePair();
     await req(p.a, 'select', { tank: 'phantom', team: 0 });
     await start(p.a, p.b);
     await req(p.a, 'command', { id: 'cloak-command-0001', command: { type: 'ability' } });
     const room = arena.rooms.get(p.ar.room!.code);
-    expect(arena.rooms.snapshot(room, p.br.playerId).match!.fighters[0].x).toBe(-1000);
+    expect(arena.rooms.snapshot(room, p.br.playerId).match!.fighters[0].statuses.phase).toBe(2);
+    expect(arena.rooms.snapshot(room, p.br.playerId).match!.fighters[0].x).toBeGreaterThan(0);
     expect(arena.rooms.snapshot(room, p.ar.playerId).match!.fighters[0].x).toBeGreaterThan(0);
   });
 });

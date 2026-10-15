@@ -26,12 +26,19 @@ const w = (
 });
 export const WEAPONS: Record<string, Weapon> = {
   standard: w('standard', 'Standard shell', 31, 820, 1, 48, 40, '#f8d58c'),
-  heavy: w('heavy', 'Heavy shell', 42, 760, 1.12, 67, 58, '#edc675'),
-  cluster: w('cluster', 'Cluster missiles', 18, 800, 1, 37, 32, '#b7dd76', {
+  heavy: w('heavy', 'Siege Cannon', 42, 760, 1.12, 67, 58, '#edc675', {
+    cooldown: 1,
+    chargeMs: 420,
+  }),
+  shadow: w('shadow', 'Shadow Lance', 34, 1080, 0.45, 25, 18, '#b898ff', {
+    chargeMs: 120,
+    direct: 20,
+  }),
+  cluster: w('cluster', 'Swarm Missiles', 18, 800, 1, 37, 32, '#b7dd76', {
     projectiles: 3,
     direct: 5,
   }),
-  piercing: w('piercing', 'Piercing cannon', 35, 960, 0.7, 34, 52, '#8dafff', {
+  piercing: w('piercing', 'Rail Piercer', 35, 960, 0.7, 34, 52, '#8dafff', {
     behavior: 'pierce',
     direct: 18,
   }),
@@ -45,15 +52,19 @@ export const WEAPONS: Record<string, Weapon> = {
     ammo: 2,
     cooldown: 2,
   }),
-  electric: w('electric', 'Arc bolt', 28, 860, 0.82, 48, 30, '#71d8f5', {
+  electric: w('electric', 'Arc Discharger', 28, 860, 0.82, 48, 30, '#71d8f5', {
     behavior: 'chain',
     status: 'emp',
   }),
-  incendiary: w('incendiary', 'Incendiary shell', 27, 800, 1, 58, 38, '#ff8662', {
+  incendiary: w('incendiary', 'Magma Mortar', 27, 800, 1, 58, 38, '#ff8662', {
     status: 'burn',
   }),
-  ice: w('ice', 'Cryo shell', 29, 850, 0.9, 50, 35, '#9fe5e8', { status: 'freeze' }),
-  seismic: w('seismic', 'Seismic shell', 34, 660, 1.15, 78, 90, '#d8ac87'),
-  plasma: w('plasma', 'Plasma pulse', 30, 850, 0.85, 48, 38, '#78dcb2'),
-  charged: w('charged', 'Charged plasma', 39, 920, 0.75, 52, 44, '#f3a0dc'),
+  ice: w('ice', 'Cryo Shard', 29, 850, 0.9, 50, 35, '#9fe5e8', { status: 'freeze' }),
+  seismic: w('seismic', 'Tectonic Shell', 34, 660, 1.15, 78, 90, '#d8ac87'),
+  plasma: w('plasma', 'Pulse Repeater', 12, 990, 0.65, 24, 17, '#78dcb2', {
+    projectiles: 3,
+    launchGapMs: 150,
+    direct: 4,
+  }),
+  charged: w('charged', 'Singularity Orb', 39, 720, 0.75, 72, 54, '#f3a0dc', { chargeMs: 650 }),
 };

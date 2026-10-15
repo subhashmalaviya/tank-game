@@ -84,17 +84,25 @@ export function generateMap(
     { length: players },
     (_, i) => 100 + (i * (WIDTH - 200)) / Math.max(1, players - 1),
   );
-  const heights = Array.from(
-    { length: COLS },
-    (_, i) =>
-      Math.round(
-        (405 +
-          Math.sin(i / 38 + phase) * theme.roughness +
-          Math.sin(i / 15 + phase2) * theme.roughness * 0.42 +
-          Math.sin(i / 6 + phase) * 7) /
-          CELL,
-      ) * CELL,
-  );
+  const heights = Array.from({ length: COLS }, (_, i) => {
+    const x = i * CELL,
+      wave = Math.sin(i / 38 + phase),
+      detail = Math.sin(i / 15 + phase2);
+    let h = 405 + wave * theme.roughness + detail * theme.roughness * 0.42;
+    if (mapId === 'desert')
+      h = 420 + Math.sin(i / 48 + phase) * 65 + Math.sin(i / 21 + phase2) * 20;
+    if (mapId === 'frozen')
+      h = 410 + Math.sin(i / 55 + phase) * 38 + Math.pow(Math.abs(detail), 5) * 40;
+    if (mapId === 'volcanic') h = 350 + 145 * Math.exp(-Math.pow((x - 720) / 310, 2)) + detail * 26;
+    if (mapId === 'jungle') h = Math.round(h / 28) * 28 + Math.sin(i / 9) * 7;
+    if (mapId === 'alien') h = 390 + wave * 60 + Math.pow(Math.sin(i / 22 + phase2), 3) * 55;
+    if (mapId === 'industrial') h = 420 + Math.round(Math.sin(i / 28 + phase) * 2) * 18;
+    if (mapId === 'canyon') h = 315 + Math.pow(Math.abs(Math.sin(i / 40 + phase)), 5) * 240;
+    if (mapId === 'islands') h = 380 + Math.sin(i / 42 + phase) * 50;
+    if (mapId === 'toxic') h = 450 + Math.sin(i / 60 + phase) * 16 + Math.pow(detail, 2) * 22;
+    if (mapId === 'neon') h = 420 + Math.floor((Math.sin(i / 25 + phase) + 1) * 3) * 18;
+    return Math.round(Math.max(250, Math.min(600, h)) / CELL) * CELL;
+  });
   for (const x of spawnXs) {
     const h = heights[Math.floor(x / CELL)];
     for (let c = Math.floor((x - 30) / CELL); c <= Math.floor((x + 30) / CELL); c++) heights[c] = h;
@@ -118,5 +126,15 @@ export function generateMap(
       if (spawnXs.every((s) => Math.abs(x - s) > 90))
         hazards.push({ x, y: terrain.surface(x) - 3, radius: 38, kind: theme.hazard, turns: 9999 });
     }
+  if (theme.hazard && !hazards.length) {
+    const x = (spawnXs[0] + spawnXs[1]) / 2;
+    hazards.push({
+      x,
+      y: terrain.surface(x) - 3,
+      radius: Math.min(38, (spawnXs[1] - spawnXs[0]) / 2 - 35),
+      kind: theme.hazard,
+      turns: 9999,
+    });
+  }
   return { terrain, spawns, hazards };
 }

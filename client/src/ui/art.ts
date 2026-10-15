@@ -14,6 +14,19 @@ export function drawTank(
   c.save();
   c.translate(x, y);
   c.scale(scale, scale);
+  const profiles: Record<TankId, [number, number]> = {
+    titan: [1.2, 1.12],
+    phantom: [1.12, 0.72],
+    volt: [0.9, 1.18],
+    inferno: [1.02, 1],
+    frostbite: [0.95, 1.05],
+    viper: [1.15, 0.92],
+    bastion: [1.2, 1],
+    quake: [1.28, 1.15],
+    medic: [1.05, 0.9],
+    nova: [0.85, 1.12],
+  };
+  c.scale(...profiles[id]);
   c.fillStyle = '#0005';
   c.beginPath();
   c.ellipse(0, 16, 38, 9, 0, 0, Math.PI * 2);
@@ -34,6 +47,13 @@ export function drawTank(
     c.beginPath();
     c.arc(-23 + i * 9, 11, 2.6, 0, Math.PI * 2);
     c.fill();
+    c.strokeStyle = '#9cadb5';
+    c.lineWidth = 1;
+    c.beginPath();
+    const rotation = time / 100 + i;
+    c.moveTo(-23 + i * 9 + Math.cos(rotation) * 5, 11 + Math.sin(rotation) * 5);
+    c.lineTo(-23 + i * 9 - Math.cos(rotation) * 5, 11 - Math.sin(rotation) * 5);
+    c.stroke();
   }
   c.fillStyle = d.color;
   c.strokeStyle = '#16252d';
@@ -63,6 +83,76 @@ export function drawTank(
   c.fillRect(37, -5, 7, 10);
   c.fillStyle = '#fff5';
   c.fillRect(17, -3, 20, 2);
+  if (id === 'titan') {
+    c.fillStyle = d.color;
+    c.fillRect(25, -7, 20, 14);
+    c.fillStyle = '#192832';
+    c.fillRect(43, -5, 4, 10);
+  }
+  if (id === 'phantom' || id === 'bastion') {
+    c.strokeStyle = d.color;
+    c.lineWidth = 3;
+    c.beginPath();
+    c.moveTo(18, -6);
+    c.lineTo(56, -6);
+    c.moveTo(18, 6);
+    c.lineTo(56, 6);
+    c.stroke();
+  }
+  if (id === 'volt') {
+    for (let i = 0; i < 4; i++) {
+      c.strokeStyle = '#e5ffff';
+      c.beginPath();
+      c.ellipse(15 + i * 7, 0, 3, 9, 0, 0, 7);
+      c.stroke();
+    }
+  }
+  if (id === 'inferno') {
+    c.fillStyle = '#272c3c';
+    c.fillRect(18, -8, 19, 16);
+    c.fillStyle = '#ffad76';
+    c.fillRect(31, -5, 10, 10);
+  }
+  if (id === 'frostbite') {
+    c.fillStyle = '#d0ffff';
+    c.beginPath();
+    c.moveTo(15, -8);
+    c.lineTo(47, 0);
+    c.lineTo(15, 8);
+    c.fill();
+  }
+  if (id === 'viper') {
+    c.fillStyle = '#263b3b';
+    c.fillRect(4, -14, 28, 28);
+    for (let i = 0; i < 3; i++) {
+      c.fillStyle = d.color;
+      c.fillRect(7, -11 + i * 9, 28, 5);
+    }
+  }
+  if (id === 'quake') {
+    c.fillStyle = '#394048';
+    c.fillRect(10, -9, 29, 18);
+    c.fillStyle = '#e5c5a0';
+    c.fillRect(35, -12, 8, 24);
+  }
+  if (id === 'medic') {
+    c.fillStyle = '#e7fff3';
+    c.fillRect(12, -8, 28, 4);
+    c.fillRect(12, 4, 28, 4);
+  }
+  if (id === 'nova') {
+    c.fillStyle = '#201f3e';
+    c.beginPath();
+    c.arc(25, 0, 14, 0, 7);
+    c.fill();
+    c.strokeStyle = d.color;
+    c.lineWidth = 3;
+    c.stroke();
+    c.fillStyle = '#fff0ff';
+    c.beginPath();
+    c.arc(25, 0, 7, 0, 7);
+    c.fill();
+  }
   c.restore();
   c.fillStyle = d.color;
   c.beginPath();

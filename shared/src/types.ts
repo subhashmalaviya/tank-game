@@ -9,7 +9,17 @@ export type TankId =
   | 'quake'
   | 'medic'
   | 'nova';
-export type Status = 'fortify' | 'cloak' | 'emp' | 'burn' | 'freeze' | 'shield' | 'overcharge';
+export type Status =
+  | 'fortify'
+  | 'cloak'
+  | 'emp'
+  | 'burn'
+  | 'freeze'
+  | 'shield'
+  | 'overcharge'
+  | 'phase'
+  | 'hunter'
+  | 'shieldTurns';
 export interface Weapon {
   id: string;
   name: string;
@@ -25,6 +35,9 @@ export interface Weapon {
   ammo: number;
   behavior?: 'bounce' | 'guided' | 'pierce' | 'chain';
   color: string;
+  chargeMs?: number;
+  launchGapMs?: number;
+  effect?: string;
 }
 export interface TankDefinition {
   id: TankId;
@@ -57,6 +70,7 @@ export interface MapTheme {
   islands?: boolean;
 }
 export interface MatchConfig {
+  combatFlow?: 'simultaneous' | 'turns';
   mode: 'ffa' | 'teams';
   maxPlayers: number;
   teams: number;
@@ -116,6 +130,12 @@ export interface Shot {
   impact: Point;
   radius: number;
   color: string;
+  id?: string;
+  round?: number;
+  launchMs?: number;
+  impactMs?: number;
+  hit?: boolean;
+  terrainRadius?: number;
   damage: { id: string; amount: number; x: number; y: number }[];
 }
 export interface MatchResult {
@@ -136,6 +156,12 @@ export interface MatchResult {
 }
 export interface MatchState {
   id: string;
+  phase?: 'planning' | 'resolving';
+  readyIds?: string[];
+  ownPlan?: Plan;
+  resolutionStartedAt?: number;
+  environment?: Environment;
+  abilityEvents?: AbilityEvent[];
   seed: number;
   map: string;
   fighters: Fighter[];
@@ -162,7 +188,42 @@ export interface RoomState {
   match: MatchState | null;
   passwordProtected: boolean;
 }
+export interface Plan {
+  round: number;
+  angle: number;
+  power: number;
+  weapon: string;
+  ability: boolean;
+  targetId?: string;
+  pass?: boolean;
+}
+export interface AbilityEvent {
+  owner: string;
+  tank: TankId;
+  x: number;
+  y: number;
+  targetId?: string;
+  label: string;
+}
+export interface Cover {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  hp: number;
+  maxHp: number;
+  material: 'stone' | 'ice' | 'metal' | 'wood' | 'barrel' | 'barrier';
+  active: boolean;
+}
+export interface Environment {
+  wind: number;
+  gravityZones: { from: number; to: number; multiplier: number }[];
+  cover: Cover[];
+  rules: string;
+}
 export type Command =
+  | ({ type: 'lock' } & Plan)
   | { type: 'move'; direction: -1 | 1; distance: number }
   | { type: 'fire'; angle: number; power: number; weapon: string }
   | { type: 'ability'; targetId?: string }

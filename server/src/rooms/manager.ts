@@ -1,3 +1,4 @@
+import { RoundGame } from '../game/rounds';
 import { randomBytes, randomUUID, createHash, timingSafeEqual } from 'node:crypto';
 import { Game } from '../game/engine';
 import { DEFAULT_CONFIG, configSchema } from '../../../shared/src/configs/match';
@@ -170,7 +171,11 @@ export class Rooms {
       new Set(room.members.map((m) => m.tank)).size !== room.members.length
     )
       throw new Error('Choose different tanks for unique selection.');
-    room.game = new Game(room.members, room.config, randomBytes(4).readUInt32LE());
+    room.game = new (room.config.combatFlow === 'turns' ? Game : RoundGame)(
+      room.members,
+      room.config,
+      randomBytes(4).readUInt32LE(),
+    );
     room.recorded = false;
     room.matchAccounts = Object.fromEntries(
       room.members.filter((p) => p.accountId).map((p) => [p.id, p.accountId!]),
@@ -214,8 +219,11 @@ export class Rooms {
     this.disconnect(room, member);
     if (room.game && !room.game.state.result) {
       const f = room.game.state.fighters.find((p) => p.id === member.id);
-      if (f) f.hp = 0;
-      room.game.checkWin();
+      if (room.game instanceof RoundGame) room.game.forfeit(member.id);
+      else {
+        if (f) f.hp = 0;
+        room.game.checkWin();
+      }
     }
     member.token = '';
     room.members = room.members.filter((m) => m.id !== member.id);
@@ -241,7 +249,12 @@ export class Rooms {
       connected: p.connected,
       bot: p.bot,
     });
-    let match = room.game ? structuredClone(room.game.state) : null;
+    let match =
+      room.game instanceof RoundGame
+        ? room.game.snapshot(viewerId)
+        : room.game
+          ? structuredClone(room.game.state)
+          : null;
     if (match) {
       const viewer = match.fighters.find((f) => f.id === viewerId);
       for (const f of match.fighters)

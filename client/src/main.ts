@@ -5,6 +5,9 @@ import '@fontsource/dm-sans/latin-500.css';
 import '@fontsource/dm-sans/latin-600.css';
 import '@fontsource/dm-sans/latin-700.css';
 import './style.css';
+import './battle.css';
+import { BattleControls } from './input/BattleControls';
+import { ENVIRONMENT_RULES } from '../../shared/src/maps/environment';
 import { TANKS, TANK_IDS } from '../../shared/src/configs/tanks';
 import { MAPS, mapById } from '../../shared/src/configs/maps';
 import { WEAPONS } from '../../shared/src/configs/weapons';
@@ -38,6 +41,7 @@ let room: RoomState | null = null,
   selectedTank: TankId = 'titan',
   modalKind = '',
   busy = false;
+let battleControls: BattleControls | null = null;
 let accountToken = localStorage.getItem('arena-account') ?? '',
   callsign = localStorage.getItem('arena-name') ?? 'Commander';
 const escape = (s: unknown) =>
@@ -75,6 +79,9 @@ function header() {
   return `<header class="topbar"><a href="#" class="brand" data-action="home" aria-label="Tank Arena home"><span class="brand-mark"><i></i></span><span>TANK<span class="brand-light">ARENA</span><small>CHAOS WARS</small></span></a><nav aria-label="Main navigation">${['play', 'armory', 'guide'].map((p) => btn(p, p === 'play' ? 'Play' : p === 'armory' ? 'Tank collection' : 'Field guide', `nav-link ${page === p ? 'active' : ''}`)).join('')}</nav><div class="top-right"><span class="connection ${connected ? 'online' : ''}" title="Server connection"><i></i><span>${connected ? 'SYSTEMS ONLINE' : 'CONNECTING'}</span></span>${btn('settings', '<span aria-hidden="true">⚙</span>', 'icon-button', 'aria-label="Settings"')}${btn('account', `<span class="avatar">${escape(callsign.slice(0, 1).toUpperCase())}</span><span class="profile-name">${escape(callsign)}<small>${accountToken ? 'PILOT ACCOUNT' : 'GUEST PILOT'}</small></span>`, 'profile', 'aria-label="Pilot account"')}</div></header>`;
 }
 function destroyArena() {
+  battleControls?.destroy();
+  battleControls = null;
+  document.body.classList.remove('in-battle');
   arena?.game.destroy(true);
   arena = null;
 }
@@ -124,7 +131,7 @@ function tankModal(id: TankId) {
   );
 }
 function renderGuide(main: HTMLElement) {
-  main.innerHTML = `<section class="page-heading"><div class="eyebrow">A LITTLE KNOW-HOW GOES A LONG WAY</div><h1>Make every<br><em>shot count.</em></h1></section><div class="guide-grid"><article class="panel"><span class="eyebrow">01 / THE BASICS</span><h2>Move. Aim. Make a crater.</h2><p>Each living pilot gets one turn. Move within your tank’s range, use an ability, then fire. A shot ends your turn once every projectile resolves.</p><p>The dotted line shows the start of your trajectory. Higher power sends a shell farther. An angle of 90° fires straight up; angles above 90° fire left.</p><p>Standing on the edge? Explosions remove real terrain. Long falls hurt. Floating island gaps can eliminate a tank.</p></article><article class="panel"><span class="eyebrow">02 / THE CONTROLS</span><h2>Your command center.</h2><dl><dt>A / D</dt><dd>Move left / right</dd><dt>← / →</dt><dd>Adjust cannon angle</dd><dt>W / S</dt><dd>Adjust power</dd><dt>Space</dt><dd>Fire selected weapon</dd><dt>E</dt><dd>Activate ability</dd><dt>Click arena</dt><dd>Aim at a point</dd></dl><p>On touch screens, use the movement buttons and aim / power sliders.</p></article><article class="panel"><span class="eyebrow">03 / THE CREW</span><h2>Bring a worthy rival.</h2><p>Create a room, copy its invitation link, and send it to your friends. Everyone chooses a tank and marks ready; the host starts the match.</p><p>Team battles need complete teams. Fill missing seats with bots. Team labels are shown alongside colors.</p><p>If disconnected, reopen the same tab within two minutes. Your seat and the server’s state will be restored. Disconnected hosts transfer after 30 seconds.</p></article></div><div class="section-heading"><h2>Ten worlds. Endless wreckage.</h2></div><div class="map-grid">${MAPS.map((m) => `<article class="map-card"><img src="${mapPreview(m.id)}" alt="${m.name} terrain preview"><div><h3>${m.name}</h3><p>${m.tag}${m.hazard ? ' · hazardous terrain' : ''}</p></div></article>`).join('')}</div>`;
+  main.innerHTML = `<section class="page-heading"><div class="eyebrow">A LITTLE KNOW-HOW GOES A LONG WAY</div><h1>Make every<br><em>shot count.</em></h1></section><div class="guide-grid"><article class="panel"><span class="eyebrow">01 / THE BASICS</span><h2>Move. Aim. Make a crater.</h2><p>All living pilots plan together. Move within your tank’s range, queue a special, then lock in. Choices stay secret until everyone is ready. All attacks resolve in the same round. The host can also select classic turns.</p><p>The dotted line previews your own trajectory, including wind and gravity fields. Higher power sends a shell farther. An angle of 90° fires straight up; angles above 90° fire left.</p><p>Standing on the edge? Explosions remove real terrain. Long falls hurt. Floating island gaps can eliminate a tank.</p></article><article class="panel"><span class="eyebrow">02 / THE CONTROLS</span><h2>Your command center.</h2><dl><dt>A / D</dt><dd>Move left / right</dd><dt>← / →</dt><dd>Move left / right</dd><dt>W / S</dt><dd>Adjust power</dd><dt>Space</dt><dd>Lock in your shot</dd><dt>E</dt><dd>Queue special ability</dd><dt>Drag arena</dt><dd>Aim the cannon</dd><dt>1–6</dt><dd>Select weapon</dd><dt>Escape</dt><dd>Settings</dd></dl><p>On touch screens, use separate movement and aiming joysticks, the vertical power slider, and weapon boxes. Once locked, your plan cannot change.</p></article><article class="panel"><span class="eyebrow">03 / THE CREW</span><h2>Bring a worthy rival.</h2><p>Create a room, copy its invitation link, and send it to your friends. Everyone chooses a tank and marks ready; the host starts the match.</p><p>Team battles need complete teams. Fill missing seats with bots. Team labels are shown alongside colors.</p><p>If disconnected, reopen the same tab within two minutes. Your seat and the server’s state will be restored. Disconnected hosts transfer after 30 seconds.</p></article></div><div class="section-heading"><h2>Ten worlds. Endless wreckage.</h2></div><div class="map-grid">${MAPS.map((m) => `<article class="map-card"><img src="${mapPreview(m.id)}" alt="${m.name} terrain preview"><div><h3>${m.name}</h3><p>${ENVIRONMENT_RULES[m.id]}</p></div></article>`).join('')}</div>`;
 }
 const previews = new Map<string, string>();
 function mapPreview(id: string) {
@@ -204,7 +211,7 @@ function renderLobby(main: HTMLElement) {
     host = r.hostId === identity.id,
     me = r.players.find((p) => p.id === identity.id),
     config = r.config;
-  main.innerHTML = `<section class="lobby-heading"><div><span class="eyebrow">${config.visibility === 'public' ? 'PUBLIC MATCHMAKING · BOT JOINS AFTER 10 SECONDS' : 'PRIVATE ROOM · YOUR RULES'}</span><h1>Assemble the crew<span>.</span></h1></div><div class="room-code"><small>ROOM CODE</small><b>${r.code}</b>${btn('copy', 'Copy invite ↗', 'text-button')}</div></section><div class="lobby-layout"><section class="panel crew-panel"><div class="panel-heading"><h2>Pilots <span>${r.players.length} / ${config.maxPlayers}</span></h2><span class="pill">${config.mode === 'teams' ? `${config.teams} TEAMS` : 'FREE FOR ALL'}</span></div><div class="crew-list">${r.players.map((p, i) => `<div class="crew-row"><span class="crew-number">${String(i + 1).padStart(2, '0')}</span><img src="${tankArt(p.tank)}" alt=""><div><b>${escape(p.name)} ${p.id === identity.id ? '<small>YOU</small>' : ''}</b><span>${TANKS[p.tank].name} ${config.mode === 'teams' ? '· TEAM ' + (p.team + 1) : ''}${p.id === r.hostId ? ' · HOST' : ''}</span></div><span class="ready-status ${p.ready ? 'is-ready' : ''}">${!p.connected ? 'OFFLINE' : p.ready ? '✓ READY' : 'CHOOSING'}</span></div>`).join('')}${Array.from({ length: Math.max(0, config.maxPlayers - r.players.length) }, (_, i) => `<div class="crew-row empty"><span class="crew-number">${String(i + r.players.length + 1).padStart(2, '0')}</span><span class="empty-icon">+</span><span>${i < config.bots ? 'AI pilot will join at launch' : 'Waiting for a worthy rival…'}</span></div>`).join('')}</div><div class="lobby-actions">${btn('ready', me?.ready ? '✓ Ready — undo' : 'Mark ready', me?.ready ? 'button success' : 'button primary')}${host ? btn('start', 'Launch battle →', 'button secondary') : ''}${btn('leave', 'Leave room', 'text-button')}</div><p class="fine-print">All pilots must be ready. ${config.mode === 'teams' ? 'Every team must be full.' : 'At least two pilots or bots required.'}</p><div class="panel-heading tank-picker-heading"><h2>Your machine</h2><span class="muted">${me ? TANKS[me.tank].role : ''}</span></div><div class="tank-picker">${TANK_IDS.map((id) => `<button class="pick-tank ${me?.tank === id ? 'active' : ''}" data-select-tank="${id}" title="${TANKS[id].ability.name}" aria-label="Select ${TANKS[id].name}"><img src="${tankArt(id)}" alt=""><span>${TANKS[id].name}</span></button>`).join('')}</div>${config.mode === 'teams' ? `<label>Your team<select id="my-team">${Array.from({ length: config.teams }, (_, i) => `<option value="${i}" ${me?.team === i ? 'selected' : ''}>Team ${i + 1}</option>`).join('')}</select></label>` : ''}</section><aside class="panel rules-panel"><div class="panel-heading"><h2>Battlefield</h2><span class="eyebrow">${host ? 'HOST CONTROLS' : 'ROOM RULES'}</span></div><div class="map-preview"><img src="${mapPreview(config.map === 'random' ? 'desert' : config.map)}" alt="Battlefield preview"><span>${config.map === 'random' ? 'Uncharted territory' : mapById(config.map).name}<small>${config.map === 'random' ? 'A new world every match' : mapById(config.map).tag}</small></span></div><form id="rules"><fieldset ${host ? '' : 'disabled'}><label>Map<select name="map"><option value="random">Random battlefield</option>${MAPS.map((m) => `<option value="${m.id}" ${config.map === m.id ? 'selected' : ''}>${m.name}</option>`).join('')}</select></label><div class="form-grid"><label>Mode<select name="mode"><option value="ffa" ${config.mode === 'ffa' ? 'selected' : ''}>Free for all</option><option value="teams" ${config.mode === 'teams' ? 'selected' : ''}>Team battle</option></select></label><label>Player limit<select name="maxPlayers">${[2, 3, 4, 5, 6, 7, 8].map((n) => `<option ${config.maxPlayers === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div><div class="form-grid"><label>Teams<select name="teams">${[2, 3, 4].map((n) => `<option ${config.teams === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label><label>Team size<select name="teamSize">${[1, 2, 3, 4].map((n) => `<option ${config.teamSize === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div><div class="form-grid"><label>AI pilots<select name="bots">${Array.from({ length: 8 }, (_, n) => `<option ${config.bots === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label><label>Turn timer<select name="turnSeconds">${[15, 30, 45, 60, 90, 120].map((n) => `<option value="${n}" ${config.turnSeconds === n ? 'selected' : ''}>${n} seconds</option>`).join('')}</select></label></div><details><summary>Advanced match rules <span>+</span></summary><div class="form-grid"><label>Health<select name="healthMultiplier">${[0.5, 1, 1.5, 2, 3].map((n) => `<option value="${n}" ${config.healthMultiplier === n ? 'selected' : ''}>${n}×</option>`).join('')}</select></label><label>Damage<select name="damageMultiplier">${[0.5, 1, 1.5, 2, 3].map((n) => `<option value="${n}" ${config.damageMultiplier === n ? 'selected' : ''}>${n}×</option>`).join('')}</select></label></div><label>Tank selection<select name="tankRule">${['open', 'unique', 'random'].map((t) => `<option ${config.tankRule === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label><div class="form-grid"><label>Match minutes<input name="durationMinutes" type="number" min="1" max="60" value="${config.durationMinutes}"></label><label>Time-limit score<select name="winCondition"><option value="survival" ${config.winCondition === 'survival' ? 'selected' : ''}>Health remaining</option><option value="damage" ${config.winCondition === 'damage' ? 'selected' : ''}>Damage dealt</option></select></label></div><label>Room visibility<select name="visibility"><option value="private" ${config.visibility === 'private' ? 'selected' : ''}>Private</option><option value="public" ${config.visibility === 'public' ? 'selected' : ''}>Public</option></select></label><label class="check"><input type="checkbox" name="friendlyFire" ${config.friendlyFire ? 'checked' : ''}> Friendly fire</label><label class="check"><input type="checkbox" name="skipDisconnected" ${config.skipDisconnected ? 'checked' : ''}> Skip disconnected turns</label></details>${host ? '<button class="button secondary full" type="submit">Apply match rules</button>' : ''}</fieldset></form></aside></div>`;
+  main.innerHTML = `<section class="lobby-heading"><div><span class="eyebrow">${config.visibility === 'public' ? 'PUBLIC MATCHMAKING · BOT JOINS AFTER 10 SECONDS' : 'PRIVATE ROOM · YOUR RULES'}</span><h1>Assemble the crew<span>.</span></h1></div><div class="room-code"><small>ROOM CODE</small><b>${r.code}</b>${btn('copy', 'Copy invite ↗', 'text-button')}</div></section><div class="lobby-layout"><section class="panel crew-panel"><div class="panel-heading"><h2>Pilots <span>${r.players.length} / ${config.maxPlayers}</span></h2><span class="pill">${config.mode === 'teams' ? `${config.teams} TEAMS` : 'FREE FOR ALL'}</span></div><div class="crew-list">${r.players.map((p, i) => `<div class="crew-row"><span class="crew-number">${String(i + 1).padStart(2, '0')}</span><img src="${tankArt(p.tank)}" alt=""><div><b>${escape(p.name)} ${p.id === identity.id ? '<small>YOU</small>' : ''}</b><span>${TANKS[p.tank].name} ${config.mode === 'teams' ? '· TEAM ' + (p.team + 1) : ''}${p.id === r.hostId ? ' · HOST' : ''}</span></div><span class="ready-status ${p.ready ? 'is-ready' : ''}">${!p.connected ? 'OFFLINE' : p.ready ? '✓ READY' : 'CHOOSING'}</span></div>`).join('')}${Array.from({ length: Math.max(0, config.maxPlayers - r.players.length) }, (_, i) => `<div class="crew-row empty"><span class="crew-number">${String(i + r.players.length + 1).padStart(2, '0')}</span><span class="empty-icon">+</span><span>${i < config.bots ? 'AI pilot will join at launch' : 'Waiting for a worthy rival…'}</span></div>`).join('')}</div><div class="lobby-actions">${btn('ready', me?.ready ? '✓ Ready — undo' : 'Mark ready', me?.ready ? 'button success' : 'button primary')}${host ? btn('start', 'Launch battle →', 'button secondary') : ''}${btn('leave', 'Leave room', 'text-button')}</div><p class="fine-print">All pilots must be ready. ${config.mode === 'teams' ? 'Every team must be full.' : 'At least two pilots or bots required.'}</p><div class="panel-heading tank-picker-heading"><h2>Your machine</h2><span class="muted">${me ? TANKS[me.tank].role : ''}</span></div><div class="tank-picker">${TANK_IDS.map((id) => `<button class="pick-tank ${me?.tank === id ? 'active' : ''}" data-select-tank="${id}" title="${TANKS[id].ability.name}" aria-label="Select ${TANKS[id].name}"><img src="${tankArt(id)}" alt=""><span>${TANKS[id].name}</span></button>`).join('')}</div>${config.mode === 'teams' ? `<label>Your team<select id="my-team">${Array.from({ length: config.teams }, (_, i) => `<option value="${i}" ${me?.team === i ? 'selected' : ''}>Team ${i + 1}</option>`).join('')}</select></label>` : ''}</section><aside class="panel rules-panel"><div class="panel-heading"><h2>Battlefield</h2><span class="eyebrow">${host ? 'HOST CONTROLS' : 'ROOM RULES'}</span></div><div class="map-preview"><img src="${mapPreview(config.map === 'random' ? 'desert' : config.map)}" alt="Battlefield preview"><span>${config.map === 'random' ? 'Uncharted territory' : mapById(config.map).name}<small>${config.map === 'random' ? 'A new world every match' : mapById(config.map).tag}</small></span></div><form id="rules"><fieldset ${host ? '' : 'disabled'}><label>Combat flow<select name="combatFlow"><option value="simultaneous" ${config.combatFlow !== 'turns' ? 'selected' : ''}>Simultaneous secret planning</option><option value="turns" ${config.combatFlow === 'turns' ? 'selected' : ''}>Classic turns</option></select></label><p class="fine-print">${ENVIRONMENT_RULES[config.map === 'random' ? 'desert' : config.map]}</p><label>Map<select name="map"><option value="random">Random battlefield</option>${MAPS.map((m) => `<option value="${m.id}" ${config.map === m.id ? 'selected' : ''}>${m.name}</option>`).join('')}</select></label><div class="form-grid"><label>Mode<select name="mode"><option value="ffa" ${config.mode === 'ffa' ? 'selected' : ''}>Free for all</option><option value="teams" ${config.mode === 'teams' ? 'selected' : ''}>Team battle</option></select></label><label>Player limit<select name="maxPlayers">${[2, 3, 4, 5, 6, 7, 8].map((n) => `<option ${config.maxPlayers === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div><div class="form-grid"><label>Teams<select name="teams">${[2, 3, 4].map((n) => `<option ${config.teams === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label><label>Team size<select name="teamSize">${[1, 2, 3, 4].map((n) => `<option ${config.teamSize === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div><div class="form-grid"><label>AI pilots<select name="bots">${Array.from({ length: 8 }, (_, n) => `<option ${config.bots === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label><label>Turn timer<select name="turnSeconds">${[15, 30, 45, 60, 90, 120].map((n) => `<option value="${n}" ${config.turnSeconds === n ? 'selected' : ''}>${n} seconds</option>`).join('')}</select></label></div><details><summary>Advanced match rules <span>+</span></summary><div class="form-grid"><label>Health<select name="healthMultiplier">${[0.5, 1, 1.5, 2, 3].map((n) => `<option value="${n}" ${config.healthMultiplier === n ? 'selected' : ''}>${n}×</option>`).join('')}</select></label><label>Damage<select name="damageMultiplier">${[0.5, 1, 1.5, 2, 3].map((n) => `<option value="${n}" ${config.damageMultiplier === n ? 'selected' : ''}>${n}×</option>`).join('')}</select></label></div><label>Tank selection<select name="tankRule">${['open', 'unique', 'random'].map((t) => `<option ${config.tankRule === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label><div class="form-grid"><label>Match minutes<input name="durationMinutes" type="number" min="1" max="60" value="${config.durationMinutes}"></label><label>Time-limit score<select name="winCondition"><option value="survival" ${config.winCondition === 'survival' ? 'selected' : ''}>Health remaining</option><option value="damage" ${config.winCondition === 'damage' ? 'selected' : ''}>Damage dealt</option></select></label></div><label>Room visibility<select name="visibility"><option value="private" ${config.visibility === 'private' ? 'selected' : ''}>Private</option><option value="public" ${config.visibility === 'public' ? 'selected' : ''}>Public</option></select></label><label class="check"><input type="checkbox" name="friendlyFire" ${config.friendlyFire ? 'checked' : ''}> Friendly fire</label><label class="check"><input type="checkbox" name="skipDisconnected" ${config.skipDisconnected ? 'checked' : ''}> Skip disconnected turns</label></details>${host ? '<button class="button secondary full" type="submit">Apply match rules</button>' : ''}</fieldset></form></aside></div>`;
   document.getElementById('rules')!.addEventListener('submit', (e) => {
     e.preventDefault();
     void task(async () => {
@@ -232,79 +239,48 @@ function renderLobby(main: HTMLElement) {
   );
 }
 function renderBattle(main: HTMLElement) {
-  main.innerHTML = `<section class="battle-top"><div><span class="eyebrow">LIVE BATTLE · ROOM ${room!.code}</span><h2>${mapById(room!.match!.map).name}</h2></div><div class="battle-round"><span id="turn-label"></span><b id="turn-time">30</b></div>${btn('leave', 'Leave battle', 'text-button')}</section><div id="fighter-strip" class="fighter-strip"></div><section class="battle-shell"><div id="battle-arena"></div><div class="arena-corner">${mapById(room!.match!.map).tag.toUpperCase()}</div><div id="combat-message" class="combat-message" aria-live="polite"></div></section><section id="battle-controls" class="battle-controls"></section><p class="battle-tip">A / D move <span>·</span> ← / → aim <span>·</span> W / S power <span>·</span> Space fire <span>·</span> E ability <span>·</span> Click battlefield to aim</p><section id="results"></section>`;
-  arena = mountArena('battle-arena', (v) => {
-    angle = v;
-    syncAim();
-  });
+  document.body.classList.add('in-battle');
+  main.innerHTML =
+    '<section class="battle-shell"><div id="battle-arena"></div><div id="battle-overlay"></div></section><section id="results"></section>';
+  arena = mountArena('battle-arena');
   arena.scene.playerId = identity.id;
+  battleControls = new BattleControls(
+    document.getElementById('battle-overlay')!,
+    identity.id,
+    async (c) => {
+      await sendCommand(c);
+    },
+    (a, p, w) => {
+      angle = a;
+      power = p;
+      weapon = w;
+      syncAim();
+    },
+    toast,
+    () => (modalKind ? closeModal() : settings()),
+  );
+  arena.game.events.once('ready', () => battleControls?.bindCanvas(arena!.game.canvas));
+  // Phaser may already have created its canvas before the ready event listener.
+  setTimeout(() => {
+    if (arena?.game.canvas && !arena.game.canvas.dataset.bound) {
+      arena.game.canvas.dataset.bound = 'true';
+      battleControls?.bindCanvas(arena.game.canvas);
+    }
+  }, 200);
   updateBattle();
 }
 function updateBattle() {
-  const state = room?.match;
-  if (!state || !arena) return;
+  const s = room?.match;
+  if (!s || !arena) return;
   arena.scene.playerId = identity.id;
-  arena.scene.setState(state);
-  const me = state.fighters.find((f) => f.id === identity.id),
-    active = state.fighters.find((f) => f.id === state.activeId)!;
-  if (!me) return;
-  const mine = active.id === identity.id && !state.resolveAt && !state.result && connected;
-  const turnKey = state.id + ':' + state.turn;
-  if (turnKey !== lastTurn) {
-    lastTurn = turnKey;
-    angle = me.angle;
-    power = me.power;
-    weapon = TANKS[me.tank].weapon;
-  }
-  document.getElementById('fighter-strip')!.innerHTML = state.fighters
-    .map(
-      (f) =>
-        `<div class="fighter ${f.id === state.activeId ? 'active' : ''} ${f.hp <= 0 ? 'eliminated' : ''}" style="--tank:${TANKS[f.tank].color}"><img src="${tankArt(f.tank)}" alt=""><div><b>${escape(f.name)}${f.id === identity.id ? ' <small>YOU</small>' : ''}</b><span>${state.config.mode === 'teams' ? 'T' + (f.team + 1) + ' · ' : ''}${TANKS[f.tank].name}${f.connected ? '' : ' · OFFLINE'}</span><div class="health-track"><i style="width:${(f.hp / f.maxHp) * 100}%"></i></div></div><strong>${f.hp}<small> / ${f.maxHp}</small></strong></div>`,
-    )
-    .join('');
-  document.getElementById('turn-label')!.textContent =
-    `TURN ${state.turn} · ${active.name.toUpperCase()}`;
-  document.getElementById('combat-message')!.textContent = state.resolveAt
-    ? 'SHELLS IN FLIGHT…'
-    : mine
-      ? 'YOUR TURN. MAKE IT COUNT.'
-      : state.message;
-  const t = TANKS[me.tank],
-    disabled = mine ? '' : 'disabled';
-  document.getElementById('battle-controls')!.innerHTML =
-    `<div class="move-control"><span class="eyebrow">REPOSITION</span><div>${btn('move-left', '←', 'square-button', `${disabled} aria-label="Move left"`)}${btn('move-right', '→', 'square-button', `${disabled} aria-label="Move right"`)}</div><small>${Math.max(0, Math.floor(t.mobility * (me.statuses.freeze ? 0.3 : 1) - me.moved))}m remaining</small></div><div class="aim-control"><label for="angle">CANNON ANGLE <b id="angle-value">${angle}°</b></label><input id="angle" type="range" min="5" max="175" value="${angle}" ${disabled}><label for="power">SHOT POWER <b id="power-value">${power}%</b></label><input id="power" type="range" min="10" max="100" value="${power}" ${disabled}></div><div class="weapon-control"><label for="weapon">LOADOUT</label><select id="weapon" ${disabled}>${Object.entries(
-      me.weapons,
-    )
-      .map(
-        ([id, inv]) =>
-          `<option value="${id}" ${id === weapon ? 'selected' : ''} ${inv.ammo === 0 || inv.cooldown > 0 ? 'disabled' : ''}>${WEAPONS[id].name}${inv.ammo >= 0 ? ' · ' + inv.ammo + ' left' : ''}${inv.cooldown ? ' · cooling' : ''}</option>`,
-      )
-      .join(
-        '',
-      )}</select><small>${WEAPONS[weapon].damage} base damage · ${WEAPONS[weapon].radius}m blast</small></div><div class="ability-control"><span class="eyebrow">${me.energy} / 100 ENERGY</span>${btn('ability', `<span>✦</span> ${t.ability.name}<small>${me.statuses.emp ? 'EMP DISABLED' : me.cooldown ? Math.max(1, me.cooldown - 1) + ' TURN COOLDOWN' : t.ability.cost + ' ENERGY'}</small>`, 'ability-button', `${disabled} ${me.cooldown || me.statuses.emp || me.energy < t.ability.cost ? 'disabled' : ''} title="${t.ability.description}"`)}${
-      me.tank === 'medic' && state.config.mode === 'teams'
-        ? `<select id="heal-target" aria-label="Repair target">${state.fighters
-            .filter((f) => f.team === me.team && f.hp > 0)
-            .map((f) => `<option value="${f.id}">${escape(f.name)} · ${f.hp} HP</option>`)
-            .join('')}</select>`
-        : ''
-    }</div><div class="fire-control">${btn('fire', 'FIRE <span>↗</span>', 'button fire-button', disabled)}${btn('pass', 'Pass turn', 'text-button', disabled)}</div>`;
-  for (const id of ['angle', 'power'])
-    document.getElementById(id)!.addEventListener('input', () => {
-      angle = Number(value('angle'));
-      power = Number(value('power'));
-      syncAim();
-    });
-  document.getElementById('weapon')!.addEventListener('change', () => {
-    weapon = value('weapon');
-    syncAim();
-  });
-  syncAim();
-  if (state.result && lastResult !== state.id) {
-    lastResult = state.id;
+  arena.scene.clockOffset = clockOffset;
+  arena.scene.setState(s);
+  battleControls?.update(s, connected);
+  if (s.result && lastResult !== s.id) {
+    lastResult = s.id;
     sound.victory();
   }
-  if (state.result) renderResults();
+  if (s.result) renderResults();
 }
 function syncAim() {
   if (arena) {
@@ -330,7 +306,7 @@ function renderResults() {
 }
 function settings() {
   showModal(
-    `<div class="eyebrow">MAKE YOURSELF COMFORTABLE</div><h2>Sound & settings.</h2><label>Master volume <input id="volume" type="range" min="0" max="100" value="${sound.volume * 100}"></label><label class="check"><input type="checkbox" id="music" ${sound.music ? 'checked' : ''}> Ambient soundtrack</label><p class="muted">All sound is synthesized for Tank Arena. Settings are saved on this device.</p><label class="check"><input type="checkbox" id="reduce-motion" ${document.body.classList.contains('reduce-motion') ? 'checked' : ''}> Reduce interface motion</label>${btn('stats', 'View career statistics →', 'button secondary full')}${btn('account', 'Pilot account →', 'text-button')}`,
+    `<div class="eyebrow">MAKE YOURSELF COMFORTABLE</div><h2>Sound & settings.</h2><label>Master volume <input id="volume" type="range" min="0" max="100" value="${sound.volume * 100}"></label><label class="check"><input type="checkbox" id="music" ${sound.music ? 'checked' : ''}> Ambient soundtrack</label><p class="muted">All sound is synthesized for Tank Arena. Settings are saved on this device.</p><label class="check"><input type="checkbox" id="virtual-controls" ${document.body.classList.contains('virtual-controls') ? 'checked' : ''}> Show desktop joysticks</label><label class="check"><input type="checkbox" id="reduce-motion" ${document.body.classList.contains('reduce-motion') ? 'checked' : ''}> Reduce interface motion</label>${btn('stats', 'View career statistics →', 'button secondary full')}${btn('account', 'Pilot account →', 'text-button')}${room ? btn('leave', 'Leave room', 'text-button') : ''}`,
     'settings',
   );
   document
@@ -339,6 +315,11 @@ function settings() {
   document
     .getElementById('music')!
     .addEventListener('change', (e) => sound.setMusic((e.target as HTMLInputElement).checked));
+  document.getElementById('virtual-controls')!.addEventListener('change', (e) => {
+    const checked = (e.target as HTMLInputElement).checked;
+    document.body.classList.toggle('virtual-controls', checked);
+    localStorage.setItem('arena-virtual-controls', String(checked));
+  });
   document.getElementById('reduce-motion')!.addEventListener('change', (e) => {
     const checked = (e.target as HTMLInputElement).checked;
     document.body.classList.toggle('reduce-motion', checked);
@@ -532,35 +513,7 @@ async function leave() {
   history.replaceState(null, '', location.pathname);
   render();
 }
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
-    closeModal();
-    return;
-  }
-  if (
-    (e.target as HTMLElement).matches('input,select,textarea') ||
-    modalKind ||
-    room?.phase !== 'battle'
-  )
-    return;
-  const s = room.match!;
-  if (s.activeId !== identity.id || s.resolveAt) return;
-  if (
-    [' ', 'ArrowLeft', 'ArrowRight', 'w', 's', 'a', 'd', 'e'].includes(e.key.toLowerCase()) ||
-    e.key.startsWith('Arrow')
-  )
-    e.preventDefault();
-  if (e.key === 'ArrowLeft') angle = Math.min(175, angle + 1);
-  if (e.key === 'ArrowRight') angle = Math.max(5, angle - 1);
-  if (e.key.toLowerCase() === 'w') power = Math.min(100, power + 1);
-  if (e.key.toLowerCase() === 's') power = Math.max(10, power - 1);
-  syncAim();
-  if (e.repeat) return;
-  const action = { ' ': 'fire', a: 'move-left', d: 'move-right', e: 'ability' }[
-    e.key.toLowerCase()
-  ];
-  if (action) document.querySelector<HTMLButtonElement>(`[data-action="${action}"]`)?.click();
-});
+
 connect(
   (state) => {
     clockOffset = state.serverTime - Date.now();
@@ -606,3 +559,8 @@ if (localStorage.getItem('arena-reduce-motion') === 'true')
   document.body.classList.add('reduce-motion');
 render();
 if (new URLSearchParams(location.search).has('room') && !identity.token) friendsModal();
+
+document.body.classList.toggle(
+  'virtual-controls',
+  localStorage.getItem('arena-virtual-controls') === 'true',
+);

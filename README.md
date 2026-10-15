@@ -1,10 +1,10 @@
 # Tank Arena: Chaos Wars
 
-An original, playable multiplayer artillery game built with **Phaser 3, TypeScript, Vite, Node.js, and Socket.IO**. Ten procedurally illustrated tanks, ten seeded worlds, destructible bitmap terrain, authoritative turn-based combat, private rooms, team battles, bots, reconnection, accounts, and match history.
+An original, playable multiplayer artillery game built with **Phaser 3, TypeScript, Vite, Node.js, and Socket.IO**. Ten procedurally illustrated tanks, ten seeded worlds, destructible bitmap terrain, authoritative simultaneous secret planning and optional classic turns, private rooms, team battles, bots, reconnection, accounts, and match history.
 
 ## Run it
 
-Prerequisites: **Node.js 24+ and npm 11+**. Docker with the Compose plugin is optional. You do not need PostgreSQL for local development.
+Prerequisites: **Node.js 22+ and npm 10+**. Docker with the Compose plugin is optional. You do not need PostgreSQL for local development.
 
 ```sh
 npm ci
@@ -45,43 +45,71 @@ Replace the address with your own, allow inbound TCP 5173 on your firewall, and 
 - **Rules:** 10–120 second turns (the UI offers common presets), health and damage multipliers, friendly fire, disconnected-player skipping, 1–60 minute duration, and health or damage scoring at the time limit.
 - Elimination always ends a match when only one player/team survives. A tie in time-limit scores or simultaneous elimination is a draw. Eliminated teammates still share a surviving team's victory.
 
-## Controls
+## Controls and combat flow
 
-| Action            | Desktop                                                | Touch                           |
-| ----------------- | ------------------------------------------------------ | ------------------------------- |
-| Move              | A / D, or arrow buttons                                | Left/right buttons              |
-| Aim               | Left/right arrow keys, click battlefield, angle slider | Tap battlefield or angle slider |
-| Power             | W / S, power slider                                    | Power slider                    |
-| Fire              | Space or Fire                                          | Fire                            |
-| Ability           | E or ability button                                    | Ability button                  |
-| Change ammunition | Loadout dropdown                                       | Loadout dropdown                |
+The Phaser canvas fills the game viewport. HUD, movement/aim joysticks, power slider, inventory and action button overlay the battlefield. Portrait mode rearranges the controls and shows an optional landscape suggestion. Safe-area insets and dynamic viewport units accommodate mobile browser chrome.
 
-Angles run from 5° (right) to 175° (left); 90° points upward. The dotted arc previews the initial trajectory. A shot ends a turn after a 2.4-second animation window. The server computes the complete flight before sending the outcome. Projectiles in a volley are resolved in deterministic order and their playback is staggered.
+| Action   | Desktop                       | Touch                                 |
+| -------- | ----------------------------- | ------------------------------------- |
+| Move     | Hold A/D or left/right arrows | Drag the left joystick                |
+| Aim      | Drag on battlefield           | Drag the separate aim joystick        |
+| Power    | Mouse wheel, W/S, or slider   | Vertical power slider                 |
+| Weapon   | Number keys or weapon boxes   | Weapon boxes; + expands inventory     |
+| Special  | E or ability button           | Ability button toggles queued special |
+| Confirm  | Space or LOCK IN SHOT         | LOCK IN SHOT                          |
+| Settings | Escape or gear                | Gear                                  |
 
-Movement consumes a per-turn distance budget. Steep walls, other tanks, and gaps block horizontal movement. Gravity settles unsupported tanks after explosions. Long falls cause damage; falling off an island eliminates a tank. Friendly-fire protection covers weapon/status damage from allies; terrain changes remain shared, so destroying an ally's support can still be dangerous.
+Enable **Show desktop joysticks** in Settings if desired. Volume, ambient soundtrack and reduced motion are saved on the device. Settings does not pause an online match. Leave the match through Settings. Classic turns use FIRE and immediate ability activation instead of secret lock-in.
 
-Abilities cost energy and impose cooldowns. Pilots regain 18 energy at the beginning of their next turns. Shields absorb a fixed damage pool; Fortify reduces incoming damage. EMP blocks abilities, Freeze reduces movement by 70%, and burning causes damage on the affected pilot's turns. Cloak hides coordinates from opposing client snapshots and disables homing/bot targeting until it expires or the tank fires. It does not protect against blind splash damage.
+### Simultaneous rules
+
+1. All living players may move and prepare a shot during the planning timer. Positions and generic readiness are public. Aim, power, selected weapon and queued special remain private.
+2. LOCK IN SHOT stores a validated plan in a server-private map. Movement and edits are then prohibited. Reconnect returns only that pilot's own plan; opponents receive neutral aim values and no private inventory state.
+3. When everyone is ready, defensive/healing/area abilities activate. An EMP submitted in the same round cannot retroactively cancel another valid sealed ability. If an ally moves outside Repair Field range or a Fault Line target becomes ineligible after lock, that ability fizzles without energy or cooldown cost; the shot still fires.
+4. All projectiles are calculated against the same post-ability terrain, cover and fighter positions. Every eligible pilot fires, even if another shot will eliminate them. Impacts union their craters. Damage is accumulated, armor/buffs applied, and each shield absorbs from the combined volley once. This removes shot-order advantage for health and terrain collisions. Ability application uses stable pilot-ID order for overlapping heals/terrain effects.
+5. Launch and impact timestamps, paths, damage attribution and terrain radii drive client effects. HP and final terrain commit together when the final flight finishes. Confirmed crater events can be drawn at impact. Surviving players enter the next round; simultaneous final eliminations draw.
+
+A missed planning deadline submits a **pass**, not a guessed attack. With **Skip disconnected turns** enabled, an unsubmitted disconnected pilot passes on the next server tick. With it disabled they retain the seat until the deadline. Already sealed plans survive disconnects. Explicit leave forfeits the tank; launched attacks still resolve. Reconnection restores the authoritative snapshot. Match time limits are checked at round boundaries.
+
+Angles run from 5° (right) to 175° (left). The private trajectory uses the same projectile simulation, wind, gravity and cover as the server. It previews one projectile at the selected angle, not all spread missiles; opponents can still move before the round resolves.
+
+Movement consumes a per-round distance budget, including ice drift. Walls, cover, other tanks and gaps block movement. After terrain destruction tanks settle, long falls cause damage, and falling below the world eliminates a tank. Friendly-fire protection covers attacks and owned fire zones; shared terrain removal can still remove an ally's footing.
+
+Abilities consume energy and impose cooldowns. Surviving pilots regain 18 energy each new round. Fortify and Phase Shift protect the current and following volley. EMP and freeze applied this round restrict the next planning phase. Shield strength expires after three volleys. Heavy artillery has a one-round weapon cooldown; other equipped weapons remain available. Every shot, cooldown and resource check is authoritative.
 
 ## Tanks, weapons, and worlds
 
-All ten tanks are unlocked; rarity is an informational collection category, with no purchases or progression gate.
+All ten tanks are unlocked. Original procedural artwork gives each chassis a distinct profile, turret and barrel. Effects and synthesized sounds are separate from hit calculations.
 
-| Tank      | Role               | Main weapon                      | Ability              |
-| --------- | ------------------ | -------------------------------- | -------------------- |
-| TITAN     | Heavy assault      | Heavy shell                      | Fortify              |
-| PHANTOM   | Stealth precision  | Standard shell with damage bonus | Cloak                |
-| VOLT      | Electric disruptor | Arc bolt / chain damage          | EMP                  |
-| INFERNO   | Area denial        | Incendiary shell                 | Burning Ground       |
-| FROSTBITE | Crowd control      | Cryo shell                       | Freeze               |
-| VIPER     | Artillery          | Three-missile cluster            | Five-missile barrage |
-| BASTION   | Defensive support  | Piercing cannon                  | Energy Shield        |
-| QUAKE     | Terrain engineer   | Seismic shell                    | Earthshaker          |
-| MEDIC-X   | Team support       | Plasma pulse                     | Repair Pulse         |
-| NOVA      | Glass cannon       | Charged plasma                   | Overcharge           |
+| Tank      | Main weapon                                       | Special                                                     |
+| --------- | ------------------------------------------------- | ----------------------------------------------------------- |
+| TITAN     | Siege Cannon: slow shell, large crater, knockback | Fortify: 55% damage reduction                               |
+| PHANTOM   | Shadow Lance: fast, narrow energy strike          | Phase Shift: 65% damage reduction; position stays public    |
+| VOLT      | Arc Discharger: chains to two nearby enemies      | EMP Pulse: disables nearby enemy abilities                  |
+| INFERNO   | Magma Mortar: burning impact zone                 | Inferno Field: three-round fire zone                        |
+| FROSTBITE | Cryo Shard: freezing impact                       | Absolute Zero: nearby enemy movement reduced 70%            |
+| VIPER     | Swarm Missiles: three separate flights            | Hunter Lock: five missiles with limited horizontal guidance |
+| BASTION   | Rail Piercer: high speed, armor bypass            | Aegis Dome: 40-point shield for self/nearby allies          |
+| QUAKE     | Tectonic Shell: wide terrain damage               | Fault Line: directional terrain rupture and path damage     |
+| MEDIC-X   | Pulse Repeater: three small plasma pulses         | Repair Field: up to 36 HP to self or valid teammate         |
+| NOVA      | Singularity Orb: slow orb, implosion/shockwave    | Overcharge: next attack gains 65% damage, costs 55 energy   |
 
-Every tank also carries a standard shell, three ricochets, and two seeker missiles. Ricochets bounce twice; seekers provide limited horizontal homing; piercing shells ignore armor and penetrate an additional collision sample. Ammo and cooldowns are server-enforced. Medic can select a living nearby ally in team mode. Range-limited offensive abilities automatically select the nearest eligible enemy.
+Shared loadouts include standard shells, three ricochets, two seekers, cryo and incendiary shells. Duplicate weapon types appear once. Ricochets bounce twice; seekers provide limited horizontal guidance. Rail shots ignore armor and penetrate one terrain collision sample; **they do not penetrate multiple tanks**. Hunter Lock automatically guides toward nearby enemies; it does not provide manual target selection. Repair Field has an ally selector in team games. All descriptions and balance values live in shared configuration/ability modules.
 
-The ten map themes are Desert Dunes, Frozen Wasteland, Volcanic Crater, Jungle Ruins, Alien Planet, Industrial Wasteland, Canyon Clash, Floating Islands, Toxic Swamp, and Neon City. Themes vary terrain roughness, palette, scenery, gravity, ice drift, separated platforms, and hazards. Alien terrain includes a central low-gravity field. Terrain, collision, and generated cover share a 4-world-unit bitmap. Scenery drawn above terrain is decorative; it is not a separate destructible building simulation.
+| World                | Geometry and authoritative mechanic                                                                                |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Desert Dunes         | Broad rolling dunes, seeded wind, 20% larger sand craters, stone ruins                                             |
+| Frozen Wasteland     | Smooth snow shelves and ice ridges; budgeted 4m drift; heavy/seismic weapons shatter ice cover                     |
+| Volcanic Crater      | Central basin; marked lava deals 14 base damage at round end, radius expands every third round                     |
+| Jungle Ruins         | Terraced ground; wooden and stone cover blocks shots; incendiary hits ignite wood                                  |
+| Alien Planet         | Irregular crystal hills; central 0.55× gravity and outer 1.25× gravity fields                                      |
+| Industrial Wasteland | Factory terraces; metal resists ordinary shots, barrels detonate, energy zones deal 9 base damage                  |
+| Canyon Clash         | Deep valleys/ridges; seismic impacts add 12 base rockfall damage within 110m                                       |
+| Floating Islands     | Disconnected platforms; removing support can cause elimination below the world                                     |
+| Toxic Swamp          | Shallow undulating ground; marked pools deal 9 base damage and shrink every fourth round                           |
+| Neon City            | Stepped city ground; barriers alternate active rounds, electricity overloads them; energy zones deal 9 base damage |
+
+Hazards apply when a tank center is within the marked radius plus its 12-unit collision allowance at round end. Armor and defensive buffs mitigate hazard damage. Fire zones last three rounds. Lava/toxic/energy map zones last the match. The seed reproduces terrain, cover, wind and spawns. Spawn pads and hazard/cover clearance are validated for 2–8 players; team seats are interleaved. Cover has independent health/material collision, while terrain uses a 4-unit bitmap. Background scenery is decorative. Classic mode retains the earlier map rules; new cover/wind/round-based mechanics apply to simultaneous mode.
 
 ## Accounts and statistics
 
@@ -100,9 +128,13 @@ client/src/
   audio/sound.ts            Synthesized effects and ambient soundtrack
   networking/network.ts    Socket client, acknowledgements and reconnect identity
   main.ts                  Menus, collection, lobby, HUD, results, settings and account UI
-  style.css                Responsive desktop and touch layouts
+  style.css                Existing menus and lobby
+  battle.css               Full-viewport responsive combat overlays
+  input/BattleControls.ts   Unified pointer, keyboard and joystick input
+  effects/weapons.ts        Bounded procedural weapon animation playback
 server/src/
-  game/engine.ts            Authoritative combat, bots, turns, damage and victory
+  game/engine.ts            Retained classic combat, movement, damage and victory
+  game/rounds.ts            Private plans, simultaneous resolution, round bots and timeout rules
   rooms/manager.ts          Membership, room configuration, reconnects, host transfer
   networking/server.ts     HTTP API, Socket.IO validation and isolated broadcasts
   persistence/store.ts     Account/session/history storage: PostgreSQL or atomic JSON
@@ -113,17 +145,18 @@ shared/src/
   abilities/abilities.ts   Common ability interface and all ten implementations
   physics/projectile.ts    Gravity, substepped collision, ricochet and homing
   maps/terrain.ts          Seeded generation, bitmap collision, craters, RLE snapshots
+  maps/environment.ts      Seeded cover, wind, gravity zones and environment rules
   types.ts                 Shared protocol/state types
  tests/                    Vitest engine, lifecycle, persistence and socket integration
 ```
 
-The simulation is isolated from Socket.IO and rendering. `Game.action()` accepts input commands; `Game.tick()` advances clocks and bots. A future simultaneous-action ruleset can reuse the physics, terrain, weapon, and ability modules while replacing turn scheduling.
+The simulation is isolated from Socket.IO and rendering. `Game.action()` accepts input commands; `Game.tick()` advances clocks and bots. `RoundGame` extends the preserved movement/victory core with server-private plans and simultaneous round scheduling; the room selects the appropriate engine from `combatFlow`.
 
 ### Authoritative networking
 
-Clients submit `move`, `fire`, `ability`, or `pass` commands with unique command IDs. They never submit hits, damage, terrain edits, or winners. The transport validates exact payload shapes, finite numeric bounds, membership, ownership, and command IDs before the engine checks turns, resources, cooldowns, and inventory.
+Clients submit `move`, `lock`, or `pass` commands in simultaneous mode, or `fire`/`ability` in classic mode with unique command IDs. They never submit hits, damage, terrain edits, or winners. The transport validates exact payload shapes, finite numeric bounds, membership, ownership, and command IDs before the engine checks turns, resources, cooldowns, and inventory.
 
-Rooms use Socket.IO membership and personalized state broadcasts. Reconnect tokens, socket IDs, account IDs, password hashes, and processed-command sets are never included in shared state. Enemy cloak positions are filtered. A resume token can reclaim only its own seat; a new connection invalidates the old socket's control.
+Rooms use Socket.IO membership and personalized state broadcasts. Reconnect tokens, socket IDs, account IDs, password hashes, and processed-command sets are never included in shared state. Unrevealed plans never enter broadcast state; snapshots include only the requesting pilot’s own plan. A resume token can reclaim only its own seat; a new connection invalidates the old socket's control.
 
 Full RLE-compressed terrain snapshots and authoritative tank state are sent after accepted actions and turn transitions. The client does not reconstruct explosion damage. Snapshots include server time to compensate for browser clock offset. Late joiners cannot enter an ongoing battle; existing pilots can reconnect with a complete snapshot.
 
@@ -142,7 +175,16 @@ The tests run a real ephemeral HTTP/Socket.IO server and multiple actual Socket.
 
 Coverage includes all tank abilities and energy/cooldown restrictions, every weapon's projectile and damage behavior, thin-wall collision, bouncing, armor/shields, healing allies, cluster barrages, overcharge, deterministic maps and valid separated spawns at every player count, craters and settling, timers, friendly fire, FFA and team victory, draws, room passwords/readiness, room isolation, duplicate/malformed/out-of-turn commands, disconnect/reconnect, host transfer, account persistence, complete bot matches, and rematches.
 
-Development verification was staged around the combat core, tank/map rules, network integration, and browser play. Browser checks cover the real rendered menu, a solo battle with movement/ability/shooting, private-room flow, and mobile layout. See `VERIFICATION.md` for the final run record and deployment checks that remain environment-dependent.
+The current upgrade has automated combat/network coverage and a real two-client protocol smoke test. **Browser visual/touch verification was blocked by the available browser tool's URL policy.** Do not interpret the network test as physical-device or visual verification. See `VERIFICATION.md` for the current run record.
+
+Run the same two-client smoke test against a running build or the deployed upgrade:
+
+```sh
+node scripts/smoke-multiplayer.mjs http://localhost:3001
+node scripts/smoke-multiplayer.mjs https://tank-game-ndgq.onrender.com
+```
+
+It creates a temporary private QA room, checks secret planning/reconnection/round transitions/HP/terrain/results, and leaves its seats on completion. It requires protocol 2 at `/api/health`.
 
 To adjust balancing, edit `shared/src/configs/tanks.ts` and `weapons.ts`; no engine rewrite is needed. To format source, run `npm run format`.
 
@@ -165,7 +207,7 @@ Vercel is designed for serverless frontends and does not support long-lived auth
 
 ### Option 1: Render Blueprint (Automatic)
 
-This repository includes a [`render.yaml`](file:///home/subhash/tank%20game/render.yaml) blueprint:
+The existing service is **https://tank-game-ndgq.onrender.com**. Preserve its environment variables and PostgreSQL connection when deploying. The repository includes a [`render.yaml`](render.yaml) blueprint:
 
 1. Push your repository to GitHub / GitLab.
 2. Log in to [Render](https://render.com) and go to **Blueprints**.
@@ -227,7 +269,7 @@ docker compose -f docker-compose.yml -f docker-compose.public.yml logs -f proxy 
 
 Caddy obtains HTTPS certificates, serves the public domain, and proxies WebSocket/polling traffic to the game. The public Compose overlay sets the exact allowed origin and trusts one reverse-proxy hop. The database has no published port.
 
-Open `https://arena.your-domain.example` on two separate devices. Create a room, join through its invitation, ready both pilots, fire, compare craters/health/turns, disconnect/reconnect one device, complete the battle, and rematch. This is the final public-network acceptance check; a running public deployment is not included in the source delivery.
+Open `https://arena.your-domain.example` on two separate devices. Create a room, join through its invitation, ready both pilots, fire, compare craters/health/turns, disconnect/reconnect one device, complete the battle, and rematch. This physical two-device check remains necessary even after the automated public-server protocol smoke test passes.
 
 Back up the database regularly, for example:
 
@@ -254,14 +296,14 @@ Development commands use exported environment variables; they do not silently re
 
 ## Known limits
 
-- The delivered code runs locally; no public host/domain was provided or deployed. Two-device internet play and TLS must be verified after deployment.
+- See `VERIFICATION.md` for deployment status. Physical two-device play, orientation changes, touch ergonomics and visual effect quality still require browser/device verification.
 - Local JSON storage and the account APIs are tested. PostgreSQL/Compose runtime verification depends on access to a working Docker daemon or PostgreSQL instance; see `VERIFICATION.md`.
 - Active matches do not survive a server restart. Existing reconnect tokens recover only a still-running room. The server sends full state snapshots, favoring correctness over bandwidth efficiency.
-- Combat is turn-based. Spectator joins, simultaneous-action play, ranked queues, accounts across multiple running server instances, password reset, email verification, and persistent progression are not implemented.
+- Simultaneous and classic modes are available. Spectator joins, ranked queues, distributed room ownership, password reset, email verification and persistent progression are not implemented.
 - Accounts are intentionally minimal; the career view retains the most recent 2,000 matches loaded by this process. It is not an unbounded lifetime analytics system.
 - Bots use a deterministic angle/power search and automatic ability use. They are competent shooting opponents, not advanced movement/team planners. Balance is an initial tested pass, not a competitive playtest certification.
 - Tank art, terrain, animations, sound effects, and background music are procedural. Font assets are bundled locally. The full battlefield is shown instead of a separate minimap; small screens benefit from landscape orientation.
-- Shot outcomes are computed immediately on the server, then animated. HP/crater state can appear before the last visual particle resolves. Projectile trails and impacts are cosmetic playback of authoritative paths.
+- Simultaneous shots share a frozen post-ability collision board. Cover destroyed by an earlier visual impact still blocks other shots in the same volley. Final HP/terrain commits after all flights. Effects are procedural, without cinematic sprite assets, heat-distortion shaders or a physical rockfall simulation. Reduced motion disables shake; essential projectile playback remains.
 
 ## Assets and third-party notices
 
