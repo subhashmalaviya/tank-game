@@ -26,19 +26,43 @@ export async function createArena(
   app.disable('x-powered-by');
   if (process.env.TRUST_PROXY === '1') app.set('trust proxy', 1);
   app.use(express.json({ limit: '8kb' }));
-  const origins =
-    options.origins ??
-    (
-      process.env.ALLOWED_ORIGINS ??
-      'http://localhost:5173,http://127.0.0.1:5173,http://localhost:3001'
-    ).split(',');
+  const configuredOrigins = (
+    process.env.ALLOWED_ORIGINS ??
+    'http://localhost:5173,http://127.0.0.1:5173,http://localhost:3001'
+  )
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (process.env.RENDER_EXTERNAL_URL) {
+    configuredOrigins.push(process.env.RENDER_EXTERNAL_URL.trim());
+  }
+
+  const origins = options.origins ?? configuredOrigins;
+
+  const isOriginAllowed = (origin?: string, host?: string) => {
+    if (!origin) return true;
+    if (origins.includes('*') || origins.includes(origin)) return true;
+    if (host && (origin === `http://${host}` || origin === `https://${host}`)) return true;
+    return false;
+  };
+
   const io = new Server(http, {
     maxHttpBufferSize: 8192,
     pingTimeout: 15000,
     pingInterval: 10000,
-    cors: { origin: origins, methods: ['GET', 'POST'] },
+    cors: {
+      origin: (requestOrigin, callback) => {
+        if (!requestOrigin || isOriginAllowed(requestOrigin)) {
+          callback(null, true);
+        } else {
+          callback(null, false);
+        }
+      },
+      methods: ['GET', 'POST'],
+    },
     allowRequest: (req, done) =>
-      done(null, !req.headers.origin || origins.includes(req.headers.origin)),
+      done(null, isOriginAllowed(req.headers.origin, req.headers.host)),
   });
   const rooms = new Rooms(store),
     limiter = new Limiter(55, 10000),
@@ -46,7 +70,7 @@ export async function createArena(
     creationLimiter = new Limiter(options.creationLimit ?? 15, 60000);
   app.use((req, res, next) => {
     const origin = req.headers.origin;
-    if (origin && origins.includes(origin)) {
+    if (origin && isOriginAllowed(origin, req.headers.host)) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
