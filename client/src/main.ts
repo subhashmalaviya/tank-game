@@ -372,7 +372,9 @@ async function statistics() {
     account();
     return;
   }
-  const res = await fetch(SERVER_URL + '/api/profile', { headers: { Authorization: 'Bearer ' + accountToken } }),
+  const res = await fetch(SERVER_URL + '/api/profile', {
+      headers: { Authorization: 'Bearer ' + accountToken },
+    }),
     data = await res.json();
   if (!res.ok) throw new Error(data.error);
   showModal(

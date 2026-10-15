@@ -159,6 +159,43 @@ npm start
 
 Open http://localhost:3001. The Node server serves both the compiled frontend and multiplayer API on one origin. Use a process manager or service unit for automatic restarts and a reverse proxy for HTTPS. Build before using `npm start`.
 
+## Render deployment (Recommended over Vercel)
+
+Vercel is designed for serverless frontends and does not support long-lived authoritative WebSocket connections or 60 Hz game simulation loops. Render provides persistent Web Services with full WebSocket support and zero-config single-origin hosting.
+
+### Option 1: Render Blueprint (Automatic)
+
+This repository includes a [`render.yaml`](file:///home/subhash/tank%20game/render.yaml) blueprint:
+
+1. Push your repository to GitHub / GitLab.
+2. Log in to [Render](https://render.com) and go to **Blueprints**.
+3. Click **New Blueprint Instance** and select your repository.
+4. Render automatically detects `render.yaml` and provisions the Web Service with:
+   - Build command: `npm ci --include=dev && npm run build`
+   - Start command: `npm start`
+   - Health check: `/api/health`
+   - Environment variables: `NODE_ENV=production`, `NODE_VERSION=22.14.0`, `TRUST_PROXY=1`
+5. Click **Apply**. Once built, open your `https://<service-name>.onrender.com` URL to play.
+
+### Option 2: Manual Web Service setup on Render
+
+1. Go to the [Render Dashboard](https://dashboard.render.com).
+2. Click **New +** -> **Web Service**.
+3. Connect your repository.
+4. Fill in the service details:
+   - **Runtime:** `Node`
+   - **Build Command:** `npm ci --include=dev && npm run build`
+   - **Start Command:** `npm start`
+   - **Plan:** `Free`
+5. Under **Advanced** -> **Health Check Path**, enter: `/api/health`
+6. Under **Environment Variables**, add:
+   - `NODE_ENV`: `production`
+   - `NODE_VERSION`: `22.14.0`
+   - `TRUST_PROXY`: `1`
+7. Click **Create Web Service**.
+
+> **Note on Persistence:** On Render's free tier, account credentials and match histories write to `data/arena.json` on an ephemeral disk. To preserve accounts across container spin-downs, create a free PostgreSQL database on Render and set `DATABASE_URL` in the Web Service environment variables.
+
 ## Docker deployment
 
 Create an environment file and set a strong database password:

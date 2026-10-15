@@ -61,8 +61,7 @@ export async function createArena(
       },
       methods: ['GET', 'POST'],
     },
-    allowRequest: (req, done) =>
-      done(null, isOriginAllowed(req.headers.origin, req.headers.host)),
+    allowRequest: (req, done) => done(null, isOriginAllowed(req.headers.origin, req.headers.host)),
   });
   const rooms = new Rooms(store),
     limiter = new Limiter(55, 10000),

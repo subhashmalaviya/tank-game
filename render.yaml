@@ -3,8 +3,14 @@ services:
     name: tank-game
     runtime: node
     plan: free
-    buildCommand: npm ci && npm run build
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: 22.14.0
+      - key: TRUST_PROXY
+        value: "1"
+
