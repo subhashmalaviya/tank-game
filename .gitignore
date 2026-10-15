@@ -1,0 +1,15 @@
+node_modules/
+dist/
+data/
+.env
+.env.local
+.env.*.local
+test-results/
+playwright-report/
+.agents/
+.aws/
+.claude/
+.codex/
+.vercel/
+.DS_Store
+

@@ -1,0 +1,31 @@
+services:
+  arena:
+    build: .
+    restart: unless-stopped
+    environment:
+      PORT: 3001
+      NODE_ENV: production
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3001}
+      DATABASE_URL: postgres://arena:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/arena
+    ports:
+      - '127.0.0.1:3001:3001'
+    depends_on:
+      db:
+        condition: service_healthy
+    init: true
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: arena
+      POSTGRES_USER: arena
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - arena-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U arena -d arena']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  arena-db:

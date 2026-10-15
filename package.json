@@ -1,0 +1,42 @@
+{
+  "name": "tank-arena-chaos-wars",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n server,client \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "tsx watch server/src/index.ts",
+    "dev:client": "vite --host 0.0.0.0",
+    "build": "tsc --noEmit && vite build && esbuild server/src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/server/index.js",
+    "build:client": "tsc --noEmit && vite build",
+    "start": "node dist/server/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write client server shared tests *.ts *.json *.yml README.md",
+    "format:check": "prettier --check client server shared tests *.ts *.json *.yml README.md"
+  },
+  "dependencies": {
+    "@fontsource/barlow-condensed": "^5.3.0",
+    "@fontsource/dm-sans": "^5.3.0",
+    "express": "^4.21.2",
+    "pg": "^8.16.3",
+    "phaser": "^3.90.0",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.51.0",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.15.0",
+    "@types/pg": "^8.15.0",
+    "concurrently": "^9.1.2",
+    "esbuild": "^0.25.0",
+    "prettier": "^3.9.10",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3",
+    "vite": "^6.4.3",
+    "vitest": "^2.1.9"
+  }
+}
