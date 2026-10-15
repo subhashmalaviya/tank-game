@@ -83,6 +83,9 @@ export class BattleScene extends Phaser.Scene {
     }
     this.state = state;
     this.mapId = state.map;
+    const theme = mapById(state.map);
+    if (this.game?.canvas)
+      this.game.canvas.style.background = `linear-gradient(${theme.sky},${theme.horizon} 55%,#202a32)`;
     sound.map = state.map;
     if (!this.ctx) return;
     if (this.revision !== state.revision) {

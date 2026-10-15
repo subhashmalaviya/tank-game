@@ -30,6 +30,9 @@ body.in-battle {
   inset: 0;
   height: 100%;
   width: 100%;
+  max-height: none;
+  min-height: 0;
+  aspect-ratio: auto;
 }
 .in-battle canvas {
   touch-action: none;

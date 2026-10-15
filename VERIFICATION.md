@@ -27,7 +27,15 @@
 
 ## Deployment
 
-Pending final release verification. The pre-upgrade public health endpoint was reachable and returned `{"ok":true,"rooms":0}`. The upgraded endpoint includes `protocol: 2` and `build: "simultaneous-overlays-v2"` for verification.
+Release implementation is committed locally as `b53c1d3`, followed by the final viewport/documentation correction. `git push origin main` was attempted and failed: `could not read Username for 'https://github.com': No such device or address`. GitHub authentication is required before publishing. No token was requested in chat or added to the repository.
+
+**The live Render service has not been upgraded.** Its pre-upgrade health endpoint was reachable and returned `{"ok":true,"rooms":0}`. After authenticated `git push origin main`, verify Render auto-deploy completes (or trigger Deploy latest commit in its dashboard), check `/api/health` for `protocol: 2` and `build: "simultaneous-overlays-v2"`, then run:
+
+```sh
+node scripts/smoke-multiplayer.mjs https://tank-game-ndgq.onrender.com
+```
+
+The public-server smoke test remains pending deployment. Existing Render configuration and secrets were not changed.
 
 ## Main changed files
 
