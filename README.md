@@ -67,7 +67,7 @@ Enable **Show desktop joysticks** in Settings if desired. Volume, ambient soundt
 2. LOCK IN SHOT stores a validated plan in a server-private map. Movement and edits are then prohibited. Reconnect returns only that pilot's own plan; opponents receive neutral aim values and no private inventory state.
 3. When everyone is ready, defensive/healing/area abilities activate. An EMP submitted in the same round cannot retroactively cancel another valid sealed ability. If an ally moves outside Repair Field range or a Fault Line target becomes ineligible after lock, that ability fizzles without energy or cooldown cost; the shot still fires.
 4. All projectiles are calculated against the same post-ability terrain, cover and fighter positions. Every eligible pilot fires, even if another shot will eliminate them. Impacts union their craters. Damage is accumulated, armor/buffs applied, and each shield absorbs from the combined volley once. This removes shot-order advantage for health and terrain collisions. Ability application uses stable pilot-ID order for overlapping heals/terrain effects.
-5. Launch and impact timestamps, paths, damage attribution and terrain radii drive client effects. HP and final terrain commit together when the final flight finishes. Confirmed crater events can be drawn at impact. Surviving players enter the next round; simultaneous final eliminations draw.
+5. Launch and impact timestamps, paths, damage attribution and terrain radii drive client effects. The server commits final HP and terrain when the final flight finishes. Clients replay server-confirmed HP/shield deltas at each impact, so bars respond when a hit lands. Shield absorption is labeled explicitly. Confirmed crater events can be drawn at impact. Surviving players enter the next round; simultaneous final eliminations draw.
 
 A missed planning deadline submits a **pass**, not a guessed attack. With **Skip disconnected turns** enabled, an unsubmitted disconnected pilot passes on the next server tick. With it disabled they retain the seat until the deadline. Already sealed plans survive disconnects. Explicit leave forfeits the tank; launched attacks still resolve. Reconnection restores the authoritative snapshot. Match time limits are checked at round boundaries.
 
@@ -79,7 +79,7 @@ Abilities consume energy and impose cooldowns. Surviving pilots regain 18 energy
 
 ## Tanks, weapons, and worlds
 
-All ten tanks are unlocked. Original procedural artwork gives each chassis a distinct profile, turret and barrel. Effects and synthesized sounds are separate from hit calculations.
+All ten tanks are unlocked. Original procedural artwork gives each chassis a distinct profile, turret and barrel. Hull, turret and track geometry is shared with server collision so visible body hits count; barrels, antennae and effects are decorative. Effects and synthesized sounds are separate from hit calculations.
 
 | Tank      | Main weapon                                       | Special                                                     |
 | --------- | ------------------------------------------------- | ----------------------------------------------------------- |
@@ -181,6 +181,7 @@ Run the same two-client smoke test against a running build or the deployed upgra
 
 ```sh
 node scripts/smoke-multiplayer.mjs http://localhost:3001
+npx tsx scripts/smoke-bot-hit.ts http://localhost:3001
 node scripts/smoke-multiplayer.mjs https://tank-game-ndgq.onrender.com
 ```
 

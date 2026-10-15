@@ -15,6 +15,7 @@ import { WEAPONS } from '../../../shared/src/configs/weapons';
 import { projectile } from '../../../shared/src/physics/projectile';
 import type { MatchState, Fighter, Shot } from '../../../shared/src/types';
 import { drawTank } from '../ui/art';
+import { fightersAtImpact } from '../effects/combatFeedback';
 import { drawWeapon } from '../effects/weapons';
 import { sound } from '../audio/sound';
 export class BattleScene extends Phaser.Scene {
@@ -289,7 +290,11 @@ export class BattleScene extends Phaser.Scene {
         );
         c.globalAlpha = 1;
       }
-      for (const f of this.state.fighters) this.tank(c, f, time);
+      for (const f of fightersAtImpact(
+        this.state,
+        Date.now() + this.clockOffset - (this.state.resolutionStartedAt ?? Date.now()),
+      ))
+        this.tank(c, f, time);
       const a = this.state.fighters.find((f) => f.id === this.playerId);
       if (
         a &&

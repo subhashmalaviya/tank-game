@@ -1,3 +1,4 @@
+import { tankContains } from './tankGeometry';
 import { coverAt } from '../maps/environment';
 import type { Environment } from '../types';
 import { HEIGHT, WIDTH, Terrain } from '../maps/terrain';
@@ -63,11 +64,7 @@ export function projectile(
       const px = x + ((nx - x) * j) / steps,
         py = y + ((ny - y) * j) / steps;
       const target = fighters.find(
-        (t) =>
-          t.hp > 0 &&
-          (t.id !== ownerId || i > 12) &&
-          Math.abs(t.x - px) < 18 &&
-          Math.abs(t.y - py) < 14,
+        (t) => t.hp > 0 && (t.id !== ownerId || i > 12) && tankContains(t, px, py),
       );
       if (target) {
         path.push({ x: px, y: py });

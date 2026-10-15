@@ -2,6 +2,7 @@ import type { Command, MatchState } from '../../../shared/src/types';
 import { TANKS } from '../../../shared/src/configs/tanks';
 import { WEAPONS } from '../../../shared/src/configs/weapons';
 import { tankArt } from '../ui/art';
+import { fightersAtImpact } from '../effects/combatFeedback';
 import { sound } from '../audio/sound';
 const glyph: Record<string, string> = {
   standard: '◆',
@@ -37,6 +38,8 @@ export class BattleControls {
   private inventory = '';
   private connected = true;
   private lastAllowed = false;
+  private clockOffset = 0;
+  private healthAt = 0;
   angle = 45;
   power = 65;
   weapon = 'standard';
@@ -271,10 +274,15 @@ export class BattleControls {
     this.ability = !this.ability;
     this.sync();
   }
-  update(s: MatchState, connected: boolean) {
+  update(s: MatchState, connected: boolean, clockOffset = 0) {
+    this.clockOffset = clockOffset;
     this.state = s;
     this.connected = connected;
-    const me = s.fighters.find((f) => f.id === this.id);
+    const visibleFighters = fightersAtImpact(
+      s,
+      Date.now() + this.clockOffset - (s.resolutionStartedAt ?? Date.now()),
+    );
+    const me = visibleFighters.find((f) => f.id === this.id);
     if (!me) return;
     const key = s.id + ':' + s.turn;
     if (key !== this.round) {
@@ -292,17 +300,17 @@ export class BattleControls {
       this.ability = s.ownPlan.ability;
     }
     this.root.querySelector('#pilot-hud')!.innerHTML =
-      `<img src="${tankArt(me.tank)}" alt="${TANKS[me.tank].name}"><div><b>${safe(me.name)}</b><small>${TANKS[me.tank].name} · ${me.hp}/${me.maxHp} HP</small><meter min="0" max="${me.maxHp}" value="${me.hp}"></meter><small>ϟ ${me.energy} · ${me.cooldown ? 'ABILITY ' + me.cooldown + 'R' : TANKS[me.tank].ability.name} ${Object.entries(
+      `<img src="${tankArt(me.tank)}" alt="${TANKS[me.tank].name}"><div><b>${safe(me.name)}</b><small>${TANKS[me.tank].name} · <span data-health-id="${me.id}">${me.hp}/${me.maxHp} HP</span></small><meter data-meter-id="${me.id}" min="0" max="${me.maxHp}" value="${me.hp}"></meter><small>ϟ ${me.energy} · ${me.cooldown ? 'ABILITY ' + me.cooldown + 'R' : TANKS[me.tank].ability.name} ${Object.entries(
         me.statuses,
       )
         .filter(([k]) => k !== 'shieldTurns')
         .map(([k, v]) => safe(k.toUpperCase()) + ' ' + v)
         .join(' · ')}</small></div>`;
-    this.root.querySelector('#rival-hud')!.innerHTML = s.fighters
+    this.root.querySelector('#rival-hud')!.innerHTML = visibleFighters
       .filter((f) => f.id !== this.id)
       .map(
         (f) =>
-          `<div><b>${safe(f.name)} ${s.config.mode === 'teams' ? '· T' + (f.team + 1) : ''}</b><small>${f.hp}/${f.maxHp} HP · ${f.hp <= 0 ? 'OUT' : !f.connected ? 'OFFLINE' : s.readyIds?.includes(f.id) ? '✓ READY' : 'PREPARING'}</small><meter min="0" max="${f.maxHp}" value="${f.hp}"></meter></div>`,
+          `<div><b>${safe(f.name)} ${s.config.mode === 'teams' ? '· T' + (f.team + 1) : ''}</b><small><span data-health-id="${f.id}">${f.hp}/${f.maxHp} HP</span> · ${f.hp <= 0 ? 'OUT' : !f.connected ? 'OFFLINE' : s.readyIds?.includes(f.id) ? '✓ READY' : 'PREPARING'}</small><meter data-meter-id="${f.id}" min="0" max="${f.maxHp}" value="${f.hp}"></meter></div>`,
       )
       .join('');
     this.root.querySelector('#turn-label')!.textContent = (s.phase ? 'ROUND ' : 'TURN ') + s.turn;
@@ -391,6 +399,27 @@ export class BattleControls {
   private tick(t: number) {
     const dt = Math.min(0.05, (t - this.last) / 1000 || 0);
     this.last = t;
+    if (this.state && t - this.healthAt >= 50) {
+      this.healthAt = t;
+      const fighters = fightersAtImpact(
+        this.state,
+        Date.now() + this.clockOffset - (this.state.resolutionStartedAt ?? Date.now()),
+      );
+      for (const el of this.root.querySelectorAll<HTMLElement>('[data-health-id]')) {
+        const f = fighters.find((f) => f.id === el.dataset.healthId);
+        if (f)
+          el.textContent =
+            f.hp +
+            '/' +
+            f.maxHp +
+            ' HP' +
+            (f.statuses.shield ? ' · SHIELD ' + f.statuses.shield : '');
+      }
+      for (const meter of this.root.querySelectorAll<HTMLMeterElement>('[data-meter-id]')) {
+        const f = fighters.find((f) => f.id === meter.dataset.meterId);
+        if (f) meter.value = f.hp;
+      }
+    }
     const allowed = this.allowed();
     if (allowed !== this.lastAllowed) {
       this.lastAllowed = allowed;

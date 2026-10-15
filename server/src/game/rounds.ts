@@ -181,6 +181,11 @@ export class RoundGame extends Game {
         label: TANKS[a.tank].ability.name,
       });
     }
+    work.resolutionStart = work.fighters.map((f) => ({
+      id: f.id,
+      hp: f.hp,
+      shield: f.statuses.shield ?? 0,
+    }));
     const frozenTerrain = new Terrain(this.terrain.data.slice()),
       frozenFighters = structuredClone(work.fighters),
       frozenEnvironment = structuredClone(work.environment!);
@@ -366,6 +371,7 @@ export class RoundGame extends Game {
     this.state = publicState;
     this.state.shots = work.shots;
     this.state.abilityEvents = work.abilityEvents;
+    this.state.resolutionStart = work.resolutionStart;
     this.state.phase = 'resolving';
     this.state.resolveAt = work.resolveAt;
     this.state.resolutionStartedAt = now;
@@ -400,14 +406,20 @@ export class RoundGame extends Game {
         loss = Math.min(t.hp, total - shield);
       if (t.statuses.shield) t.statuses.shield -= shield;
       t.hp -= loss;
-      let assigned = 0;
+      let assigned = 0,
+        assignedShield = 0;
       entries.forEach((e, i) => {
         const amount =
           i === entries.length - 1
             ? loss - assigned
             : Math.floor((loss * e.value) / Math.max(1, total));
         assigned += amount;
-        if (e.shot) e.shot.damage.push({ id: t.id, amount, x: t.x, y: t.y });
+        const absorbed =
+          i === entries.length - 1
+            ? shield - assignedShield
+            : Math.floor((shield * e.value) / Math.max(1, total));
+        assignedShield += absorbed;
+        if (e.shot) e.shot.damage.push({ id: t.id, amount, absorbed, x: t.x, y: t.y });
         if (e.source && e.source !== t.id) this.pilot(e.source).stats.damage += amount;
       });
       if (t.hp === 0 && entries.length) {
@@ -432,6 +444,7 @@ export class RoundGame extends Game {
     }
     this.state.revision = Math.max(revision, this.state.revision) + 1;
     this.state.phase = 'planning';
+    delete this.state.resolutionStart;
     this.state.resolveAt = 0;
     this.state.shots = [];
     this.state.abilityEvents = [];

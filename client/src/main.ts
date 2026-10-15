@@ -275,7 +275,7 @@ function updateBattle() {
   arena.scene.playerId = identity.id;
   arena.scene.clockOffset = clockOffset;
   arena.scene.setState(s);
-  battleControls?.update(s, connected);
+  battleControls?.update(s, connected, clockOffset);
   if (s.result && lastResult !== s.id) {
     lastResult = s.id;
     sound.victory();

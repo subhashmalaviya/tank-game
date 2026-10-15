@@ -186,6 +186,11 @@ export class Game {
     delete a.statuses.overcharge;
     a.stats.shots++;
     let hit = false;
+    this.state.resolutionStart = this.state.fighters.map((f) => ({
+      id: f.id,
+      hp: f.hp,
+      shield: f.statuses.shield ?? 0,
+    }));
     const shots: Shot[] = [];
     for (let i = 0; i < count; i++) {
       const flight = projectile(
@@ -226,8 +231,15 @@ export class Game {
             TANKS[a.tank].damage *
             multiplier *
             this.state.config.damageMultiplier;
+          const beforeShield = t.statuses.shield ?? 0;
           const amount = this.damage(t, raw, a, weapon.behavior === 'pierce');
-          shot.damage.push({ id: t.id, amount, x: t.x, y: t.y });
+          shot.damage.push({
+            id: t.id,
+            amount,
+            absorbed: beforeShield - (t.statuses.shield ?? 0),
+            x: t.x,
+            y: t.y,
+          });
           damaged.add(t.id);
           if (t.id !== a.id) hit = true;
           if (weapon.status && t.hp > 0) t.statuses[weapon.status] = 2;
@@ -245,12 +257,19 @@ export class Game {
               Math.hypot(t.x - flight.impact.x, t.y - flight.impact.y) < 170,
           );
           if (chain) {
+            const beforeShield = chain.statuses.shield ?? 0;
             const amount = this.damage(
               chain,
               weapon.damage * 0.55 * this.state.config.damageMultiplier,
               a,
             );
-            shot.damage.push({ id: chain.id, amount, x: chain.x, y: chain.y });
+            shot.damage.push({
+              id: chain.id,
+              amount,
+              absorbed: beforeShield - (chain.statuses.shield ?? 0),
+              x: chain.x,
+              y: chain.y,
+            });
             chain.statuses.emp = 1;
             hit = true;
           }
@@ -328,6 +347,7 @@ export class Game {
     this.state.revision++;
   }
   nextTurn(now = Date.now()) {
+    delete this.state.resolutionStart;
     this.state.resolveAt = 0;
     this.state.shots = [];
     const ending = this.actor;

@@ -234,7 +234,18 @@ export function drawWeapon(c: CanvasRenderingContext2D, s: Shot, elapsed: number
     c.font = 'bold 21px sans-serif';
     c.textAlign = 'center';
     c.fillStyle = '#fff4dc';
-    for (const d of s.damage) if (d.amount) c.fillText('−' + d.amount, d.x, d.y - 65 - age / 25);
+    for (const d of s.damage) {
+      if (d.amount) {
+        c.font = 'bold 21px sans-serif';
+        c.fillStyle = '#fff4dc';
+        c.fillText('−' + d.amount, d.x, d.y - 65 - age / 25);
+      }
+      if (d.absorbed) {
+        c.fillStyle = '#a6e6ff';
+        c.font = 'bold 14px sans-serif';
+        c.fillText('SHIELD −' + d.absorbed, d.x, d.y - (d.amount ? 88 : 65) - age / 25);
+      }
+    }
     c.restore();
   }
 }

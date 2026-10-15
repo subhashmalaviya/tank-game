@@ -1,3 +1,4 @@
+import { TANK_PROFILES, HULL, turretPolygon } from '../../../shared/src/physics/tankGeometry';
 import { TANKS } from '../../../shared/src/configs/tanks';
 import type { TankId } from '../../../shared/src/types';
 export function drawTank(
@@ -9,24 +10,11 @@ export function drawTank(
   angle = 35,
   time = 0,
 ) {
-  const d = TANKS[id],
-    index = Object.keys(TANKS).indexOf(id);
+  const d = TANKS[id];
   c.save();
   c.translate(x, y);
   c.scale(scale, scale);
-  const profiles: Record<TankId, [number, number]> = {
-    titan: [1.2, 1.12],
-    phantom: [1.12, 0.72],
-    volt: [0.9, 1.18],
-    inferno: [1.02, 1],
-    frostbite: [0.95, 1.05],
-    viper: [1.15, 0.92],
-    bastion: [1.2, 1],
-    quake: [1.28, 1.15],
-    medic: [1.05, 0.9],
-    nova: [0.85, 1.12],
-  };
-  c.scale(...profiles[id]);
+  c.scale(...TANK_PROFILES[id]);
   c.fillStyle = '#0005';
   c.beginPath();
   c.ellipse(0, 16, 38, 9, 0, 0, Math.PI * 2);
@@ -59,12 +47,7 @@ export function drawTank(
   c.strokeStyle = '#16252d';
   c.lineWidth = 2;
   c.beginPath();
-  c.moveTo(-34, 1);
-  c.lineTo(-25, -12);
-  c.lineTo(22, -12);
-  c.lineTo(34, 1);
-  c.lineTo(30, 6);
-  c.lineTo(-31, 6);
+  HULL.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y)));
   c.closePath();
   c.fill();
   c.stroke();
@@ -156,11 +139,7 @@ export function drawTank(
   c.restore();
   c.fillStyle = d.color;
   c.beginPath();
-  c.moveTo(-18, -9);
-  c.lineTo(-15, -25 - (index % 3) * 2);
-  c.lineTo(10, -27);
-  c.lineTo(20, -14);
-  c.lineTo(16, -8);
+  turretPolygon(id).forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y)));
   c.closePath();
   c.fill();
   c.stroke();

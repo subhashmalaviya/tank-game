@@ -47,3 +47,12 @@ The public-server smoke test remains pending deployment. Existing Render configu
 - `tests/simultaneous.test.ts`, `environment-rounds.test.ts`, existing regression suites: server-rule coverage.
 - `scripts/smoke-multiplayer.mjs`: reproducible two-client deployed-protocol check.
 - `README.md`, `.gitignore`, `VERIFICATION.md`: controls, rules, setup/deployment and rollback/verification record.
+
+## Follow-up: visible bot hits and health feedback
+
+- Reproduced three failing cases before the fix: a shot through the drawn turret missed the old 36×28 collision rectangle and caused no damage in either classic or simultaneous combat.
+- Shared hull/turret/track geometry now drives both artwork and authoritative collision for all ten tanks.
+- Both combat modes replay confirmed damage on HUD and tank health bars at impact time; simultaneous mode retains atomic server-side round resolution. Shield absorption is included in events and labeled instead of silently hiding a blocked hit.
+- Added `tests/hit-feedback.test.ts` covering turret hits, ten silhouettes, immutable snapshots, impact-time HP feedback and shield absorption.
+- Final follow-up validation: **155 tests passed**, production build passed, and two-client multiplayer smoke test passed against the running local server.
+- Actual AI-bot smoke test (`npx tsx scripts/smoke-bot-hit.ts http://localhost:3001`) passed: Shadow Lance reduced a VIPER bot from **98 HP to 63 HP**, reporting **35 damage** and **0 shield absorption**.

@@ -136,7 +136,7 @@ export interface Shot {
   impactMs?: number;
   hit?: boolean;
   terrainRadius?: number;
-  damage: { id: string; amount: number; x: number; y: number }[];
+  damage: { id: string; amount: number; absorbed?: number; x: number; y: number }[];
 }
 export interface MatchResult {
   winnerIds: string[];
@@ -160,6 +160,7 @@ export interface MatchState {
   readyIds?: string[];
   ownPlan?: Plan;
   resolutionStartedAt?: number;
+  resolutionStart?: { id: string; hp: number; shield: number }[];
   environment?: Environment;
   abilityEvents?: AbilityEvent[];
   seed: number;
