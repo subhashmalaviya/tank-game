@@ -55,6 +55,8 @@ export const commandSchema = z.discriminatedUnion('type', [
       weapon: z.string().max(24),
       ability: z.boolean(),
       targetId: z.string().max(60).optional(),
+      superpower: z.boolean().optional(),
+      superTargetX: z.number().min(30).max(1410).optional(),
       pass: z.boolean().optional(),
     })
     .strict(),

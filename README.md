@@ -309,3 +309,33 @@ Development commands use exported environment variables; they do not silently re
 ## Assets and third-party notices
 
 All tank shapes, UI graphics, environment artwork, and synthesized sound were created for this project; no Tank Stars assets are used. Phaser, Socket.IO, Vite, Express, Zod, pg, and development tools retain their respective licenses. Barlow Condensed and DM Sans are bundled through Fontsource under the SIL Open Font License; license texts are in their installed packages. See `THIRD_PARTY_NOTICES.md`.
+
+### Compact mobile controls and signature superpowers
+
+Mobile landscape uses three transparent control zones: an aiming joystick on the left, weapons and Lock In Shot in the middle, and a plus-shaped pad on the right. Drag the joystick to aim. On the right pad, left/right moves the tank and up/down increases/decreases shot power. Hold a pad button for continuous adjustment; release, cancellation, focus loss, or lock-in stops it. The pad center displays power percentage. Portrait uses the same controls with a stacked overlay. Desktop retains mouse aiming, A/D movement, W/S power, number-key weapons, E regular ability and Space lock; **Q** queues the signature superpower.
+
+Each tank has one additional, exclusive superpower per match, configured in `shared/src/configs/superpowers.ts`. Select its button to queue/cancel it before lock-in. Targeted powers reveal a private target slider and gold battlefield marker. Lock In Shot seals the power together with the shot. The server derives the power from your tank; the client cannot choose another tank's power. READY becomes PENDING while queued/sealed, then USED on reveal. Usage survives rounds, weapon changes and reconnects; only a new match/rematch resets it. An existing EMP blocks submission. Powers are available in simultaneous planning rooms; classic-turn combat retains its ordinary abilities and weapons.
+
+| Tank      | Signature rules                                                                                                                                                                                                                                 |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| TITAN     | Reflective Aegis: one frontal projectile reflection during the volley; facing follows the sealed cannon angle.                                                                                                                                  |
+| PHANTOM   | Shadow Jump Strike: validated arc and landing within 420m, 110m blast, crater and bounded knockback. If the landing becomes occupied/blocked after sealing, the power is consumed but the tank stays safely in place and shows LANDING BLOCKED. |
+| VOLT      | Chain Lightning Storm: up to four unique enemies, first within 560m, subsequent links within 280m, 60 initial damage with 25% falloff.                                                                                                          |
+| INFERNO   | Meteor Cataclysm: target within 650m, 145m blast, up to 75 raw damage, 95m crater and three resolution ticks of fire. Cover intercepts the falling meteor and takes material-dependent damage.                                                  |
+| FROSTBITE | Absolute Freeze: enemies within 460m lose 70% of movement for two following planning rounds; shooting remains enabled. It never permanently stuns a tank or changes ice collision geometry.                                                     |
+| VIPER     | Hunter's Barrage: five guided missiles, each capped at 18 raw damage before the room multiplier; acquire a living enemy within 600m of the marked area. Existing ballistic guidance, wind, gravity, terrain and cover apply.                    |
+| BASTION   | Fortress Reflection: self-only omnidirectional dome, two reflections plus 65 separate absorption capacity for this volley.                                                                                                                      |
+| QUAKE     | Earthshatter: ground-following rupture up to 600m toward the mark, stopping at platform gaps; one 55-damage hit per eligible enemy, terrain excavation and bounded displacement.                                                                |
+| MEDIC-X   | Emergency Overdrive: up to 65 self healing, 30 healing for teammates within 230m, and 35 absorption this volley; no overheal or revival.                                                                                                        |
+| NOVA      | Singularity Collapse: 180m field; pulls enemies at most 65m along supported ground, stopping at steep terrain or cover, then up to 65 damage and a 60m crater.                                                                                  |
+
+All numbers are world units/raw damage before armor and configured room multipliers. Regular defenses still apply. Area powers exclude the user and exclude teammates unless friendly fire is enabled. Repair always helps teammates. Reflection is specular around the surface normal and may miss the attacker; it is not guaranteed homing. A projectile reflects at most once. Rail/piercing beams, meteor/ground/area effects and explosions cannot reflect. Defensive capacities are allocated in deterministic server simulation order (superpower volleys, then ordinary volleys); animation arrival order does not decide capacity. Shields expire at the next planning phase. The existing atomic round model applies healing/defenses and positional powers before normal volleys, collects damage, then settles tanks and checks victory together. Visual events never decide damage. Terrain-altering powers use the existing crater system; no unsupported ice transformation or wall tunnelling is simulated.
+
+Browser regression checks, with the dev server running:
+
+```bash
+npx playwright install chromium
+node scripts/test-battle-ui.mjs http://localhost:5173
+```
+
+If Chromium is already installed elsewhere, set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to its executable. The test exercises actual UI inputs and Socket.IO gameplay, checks five viewport sizes, and saves screenshots under `artifacts/mobile-controls/`. `npm test` includes once-only/secrecy/reconnect tests, real reflected damage, all ten power effects, simultaneous jump collisions, and eight-player team resolution. Physical-device testing and public deployment are separate from these local checks.

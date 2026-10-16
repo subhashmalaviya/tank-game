@@ -56,3 +56,17 @@ The public-server smoke test remains pending deployment. Existing Render configu
 - Added `tests/hit-feedback.test.ts` covering turret hits, ten silhouettes, immutable snapshots, impact-time HP feedback and shield absorption.
 - Final follow-up validation: **155 tests passed**, production build passed, and two-client multiplayer smoke test passed against the running local server.
 - Actual AI-bot smoke test (`npx tsx scripts/smoke-bot-hit.ts http://localhost:3001`) passed: Shadow Lance reduced a VIPER bot from **98 HP to 63 HP**, reporting **35 damage** and **0 shield absorption**.
+
+## Mobile controls and once-per-match superpowers — 2026-10-16
+
+Implemented the user's final control mapping: bottom-left aiming joystick; bottom-right cross with horizontal tank movement and vertical shot-power adjustment; central weapons, normal ability, signature power and Lock In Shot. Pointer capture, hold/release/cancel, locked-state guards and desktop shortcuts share the existing controller. A ResizeObserver fixes a reproduced stale landscape canvas after portrait rotation.
+
+Ten server-resolved signature powers use sealed plans and match-owned usage state. Added power balance configuration, targeting validation, reflected projectile physics, authoritative damage/healing/status/position effects, reveal animations and synthesized sound. Existing classic-turn powers remain disabled by design; regular classic abilities work. README documents simultaneous resolution, reflection order, blocked-jump fallback and environmental exceptions.
+
+Executed:
+- `npm test -- --reporter=dot`: **180 tests passed across 7 files**, including actual Socket.IO privacy, replay and reconnect checks.
+- `npm run build`: passed (TypeScript, Vite client, bundled server).
+- `node scripts/test-battle-ui.mjs` using locally installed Chromium: passed at **568×320, 667×375, 844×390, 390×844 and 1366×768**. Covers real UI joystick/power/movement input, hold/release/cancel, touch-target and overlap checks, canvas orientation resizing, inventory, lock-in, superpower refresh persistence and desktop shortcuts.
+- Screenshots saved locally under `artifacts/mobile-controls/` (ignored by Git).
+
+These are local automated/emulated-browser checks, not physical-device or public Render verification. No deployment configuration or credentials were changed.

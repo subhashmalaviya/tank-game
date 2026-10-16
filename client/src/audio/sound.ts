@@ -60,6 +60,24 @@ export class Sound {
     const [hz, type, duration] = voices[id] ?? [170, 'triangle', 0.25];
     this.tone(impact ? hz / 2 : hz, duration, type, 0.14, impact ? hz / 8 : hz * 1.5);
   }
+  superpower(tank: string) {
+    const ids = [
+      'titan',
+      'phantom',
+      'volt',
+      'inferno',
+      'frostbite',
+      'viper',
+      'bastion',
+      'quake',
+      'medic',
+      'nova',
+    ];
+    const i = ids.indexOf(tank),
+      hz = [180, 730, 980, 90, 1450, 310, 240, 45, 520, 115][i] ?? 220;
+    this.tone(hz, 0.7, i % 2 ? 'sawtooth' : 'sine', 0.16, hz * (i % 3 === 0 ? 0.25 : 2));
+    this.tone(hz * 1.5, 0.35, 'triangle', 0.08, hz * 0.75);
+  }
   fire() {
     this.tone(170, 0.22, 'sawtooth', 0.2, 35);
   }

@@ -1,3 +1,4 @@
+import { validateSuper, resolveSupers } from './superpowers';
 import { Game } from './engine';
 import { commandSchema } from '../../../shared/src/configs/match';
 import { TANKS } from '../../../shared/src/configs/tanks';
@@ -55,6 +56,7 @@ export class RoundGame extends Game {
   }
   private validate(a: Fighter, p: Plan) {
     if (p.round !== this.state.turn) throw new Error('This plan belongs to a different round.');
+    validateSuper(a, p, this.state, this.terrain);
     if (p.pass) return;
     const inv = a.weapons[p.weapon];
     if (!Object.hasOwn(WEAPONS, p.weapon) || !Object.hasOwn(a.weapons, p.weapon) || !inv)
@@ -181,6 +183,7 @@ export class RoundGame extends Game {
         label: TANKS[a.tank].ability.name,
       });
     }
+    const reflectionShields = resolveSupers(work, this.terrain, this.plans, damage);
     work.resolutionStart = work.fighters.map((f) => ({
       id: f.id,
       hp: f.hp,
@@ -221,6 +224,7 @@ export class RoundGame extends Game {
           id,
           work.config.mode === 'teams',
           frozenEnvironment,
+          reflectionShields,
         );
         const launchMs = (w.chargeMs ?? 180) + i * (w.launchGapMs ?? 110),
           shot: Shot = {
@@ -229,6 +233,7 @@ export class RoundGame extends Game {
             weapon: w.id,
             owner: id,
             path: flight.path,
+            reflections: flight.reflections,
             impact: flight.impact,
             hit: flight.hit,
             launchMs,
@@ -240,14 +245,16 @@ export class RoundGame extends Game {
           };
         work.shots.push(shot);
         if (!flight.hit) continue;
+        const source = flight.reflectedBy ? this.pilot(flight.reflectedBy) : a;
         const directTargets = new Set<string>();
         for (const t of frozenFighters) {
           const distance = Math.hypot(t.x - flight.impact.x, t.y - flight.impact.y),
             direct = t.id === flight.directId;
-          if (t.hp <= 0 || !this.canDamage(a, t) || (!direct && distance > w.radius + 14)) continue;
+          if (t.hp <= 0 || !this.canDamage(source, t) || (!direct && distance > w.radius + 14))
+            continue;
           damage.push({
             target: t.id,
-            source: id,
+            source: source.id,
             raw:
               (w.damage * Math.max(0.15, 1 - distance / (w.radius + 18)) +
                 (direct ? w.direct : 0)) *
@@ -275,14 +282,14 @@ export class RoundGame extends Game {
           for (const t of frozenFighters
             .filter(
               (t) =>
-                enemy(a, t, work.config.mode === 'teams') &&
+                enemy(source, t, work.config.mode === 'teams' && !work.config.friendlyFire) &&
                 !directTargets.has(t.id) &&
                 Math.hypot(t.x - flight.impact.x, t.y - flight.impact.y) < 180,
             )
             .slice(0, 2)) {
             damage.push({
               target: t.id,
-              source: id,
+              source: source.id,
               raw: w.damage * 0.55 * work.config.damageMultiplier,
               shot,
             });
@@ -295,7 +302,7 @@ export class RoundGame extends Game {
             radius: w.radius,
             kind: 'fire',
             turns: 3,
-            owner: id,
+            owner: source.id,
           });
         for (const c of work.environment!.cover) {
           if (
@@ -371,6 +378,9 @@ export class RoundGame extends Game {
     this.state = publicState;
     this.state.shots = work.shots;
     this.state.abilityEvents = work.abilityEvents;
+    this.state.superEvents = work.superEvents;
+    for (const f of this.state.fighters)
+      f.superpowerUsed = work.fighters.find((t) => t.id === f.id)!.superpowerUsed;
     this.state.resolutionStart = work.resolutionStart;
     this.state.phase = 'resolving';
     this.state.resolveAt = work.resolveAt;
@@ -448,6 +458,7 @@ export class RoundGame extends Game {
     this.state.resolveAt = 0;
     this.state.shots = [];
     this.state.abilityEvents = [];
+    this.state.superEvents = [];
     this.state.readyIds = [];
     this.plans.clear();
     if (this.checkWin(now)) return;

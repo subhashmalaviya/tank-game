@@ -250,7 +250,8 @@ function renderBattle(main: HTMLElement) {
     async (c) => {
       await sendCommand(c);
     },
-    (a, p, w) => {
+    (a, p, w, target) => {
+      if (arena) arena.scene.superTargetX = target;
       angle = a;
       power = p;
       weapon = w;
@@ -290,8 +291,8 @@ function syncAim() {
   }
   const a = document.getElementById('angle-value'),
     p = document.getElementById('power-value');
-  if (a) a.textContent = angle + '°';
-  if (p) p.textContent = power + '%';
+  if (a) a.textContent = Math.round(angle) + '°';
+  if (p) p.textContent = Math.round(power) + '%';
   const ai = document.getElementById('angle') as HTMLInputElement,
     pi = document.getElementById('power') as HTMLInputElement;
   if (ai) ai.value = String(angle);

@@ -1,3 +1,4 @@
+import { drawSuperpowers } from '../effects/superpowers';
 import Phaser from 'phaser';
 import {
   generateMap,
@@ -42,6 +43,7 @@ export class BattleScene extends Phaser.Scene {
   angle = 45;
   power = 65;
   weapon = 'standard';
+  superTargetX?: number;
   onAim?: (angle: number) => void;
   constructor() {
     super('battle');
@@ -103,6 +105,7 @@ export class BattleScene extends Phaser.Scene {
         Math.max(0, Date.now() + this.clockOffset - (state.resolutionStartedAt ?? Date.now()));
       this.sounds.clear();
       if (state.abilityEvents?.length) sound.ability();
+      for (const e of state.superEvents ?? []) sound.superpower(e.tank);
       this.impactSound = false;
     }
   }
@@ -302,6 +305,21 @@ export class BattleScene extends Phaser.Scene {
         (this.state.phase === 'planning' || this.state.activeId === a.id) &&
         !this.state.resolveAt
       ) {
+        if (this.superTargetX !== undefined && !this.state.readyIds?.includes(this.playerId)) {
+          const x = this.superTargetX,
+            y = this.terrain.surface(x) - 12;
+          c.save();
+          c.strokeStyle = '#ffd578';
+          c.lineWidth = 2;
+          c.beginPath();
+          c.arc(x, y, 22, 0, 7);
+          c.moveTo(x - 30, y);
+          c.lineTo(x + 30, y);
+          c.moveTo(x, y - 30);
+          c.lineTo(x, y + 30);
+          c.stroke();
+          c.restore();
+        }
         c.fillStyle = '#fff9';
         const key = [this.state.revision, this.angle, this.power, this.weapon].join(':');
         if (key !== this.previewKey) {
@@ -330,6 +348,13 @@ export class BattleScene extends Phaser.Scene {
       }
     } else this.drawDemo(c, time);
     this.drawShots(c);
+    if (this.state?.phase === 'resolving')
+      drawSuperpowers(
+        c,
+        this.state,
+        performance.now() - this.shotAt,
+        document.body.classList.contains('reduce-motion'),
+      );
     const abilityAge = performance.now() - this.shotAt;
     if (this.state?.phase === 'resolving' && abilityAge < 1500)
       for (const event of this.state.abilityEvents ?? []) {
@@ -573,6 +598,27 @@ export function mountArena(parent: string, onAim?: (angle: number) => void) {
     render: { antialias: true },
     audio: { noAudio: true },
     banner: false,
+  });
+  // Mobile browser chrome/orientation can resize the parent without Phaser seeing a
+  // useful window event. Observe the actual viewport container, not the physics world.
+  const host = document.getElementById(parent)!;
+  const resize = () => {
+    const { width, height } = host.getBoundingClientRect();
+    if (
+      game.canvas &&
+      width > 0 &&
+      height > 0 &&
+      (game.scale.width !== Math.round(width) || game.scale.height !== Math.round(height))
+    )
+      game.scale.resize(Math.round(width), Math.round(height));
+  };
+  const observer = new ResizeObserver(resize);
+  observer.observe(host);
+  game.events.once('ready', resize);
+  window.visualViewport?.addEventListener('resize', resize);
+  game.events.once('destroy', () => {
+    observer.disconnect();
+    window.visualViewport?.removeEventListener('resize', resize);
   });
   return { game, scene };
 }

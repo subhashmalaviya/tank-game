@@ -591,3 +591,366 @@ body.in-battle {
     max-width: 32%;
   }
 }
+
+.direction-buttons {
+  display: none;
+}
+/* Touch layouts have three independent zones; desktop's optional sticks are retained. */
+@media (max-width: 650px), (pointer: coarse), (max-width: 950px) and (max-height: 550px) {
+  .in-battle {
+    overscroll-behavior: none;
+    touch-action: none;
+  }
+  .in-battle #battle-overlay {
+    user-select: none;
+  }
+  .direction-buttons {
+    display: flex;
+    gap: 3px;
+  }
+  .direction-buttons button {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid #a4c9e677;
+    border-radius: 9px;
+    background: #102b4580;
+    color: #ecf6ff;
+    font-size: 19px;
+  }
+  .direction-buttons button:active {
+    background: #5d9ac4bb;
+  }
+  .move-overlay,
+  .aim-overlay {
+    display: block !important;
+  }
+  .move-overlay .joystick,
+  .aim-overlay .joystick {
+    display: none;
+  }
+  .aim-buttons {
+    display: grid;
+    grid-template-columns: repeat(3, 44px);
+    grid-template-rows: repeat(2, 44px);
+  }
+  .aim-buttons button:first-child {
+    grid-column: 2;
+  }
+  .aim-buttons button:nth-child(2) {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .aim-buttons button:nth-child(3) {
+    grid-column: 3;
+    grid-row: 2;
+  }
+  .aim-buttons button:nth-child(4) {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .power-buttons {
+    flex-direction: column;
+  }
+  .power-overlay input {
+    display: none;
+  }
+  .move-overlay small,
+  .aim-overlay small {
+    margin-top: 3px;
+    font-size: 9px;
+  }
+}
+@media (orientation: landscape) and (pointer: coarse),
+  (orientation: landscape) and (max-width: 950px) and (max-height: 550px) {
+  .aim-overlay {
+    left: max(8px, env(safe-area-inset-left));
+    bottom: max(8px, env(safe-area-inset-bottom));
+  }
+  .move-overlay {
+    left: auto;
+    right: max(8px, env(safe-area-inset-right));
+    bottom: max(8px, env(safe-area-inset-bottom));
+  }
+  .arsenal-overlay {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: 296px;
+    max-width: none;
+    padding: 5px;
+  }
+  .arsenal-row {
+    gap: 4px;
+  }
+  #weapon-grid {
+    gap: 3px;
+  }
+  #weapon-grid button {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+  }
+  #weapon-grid button > span {
+    font-size: 25px;
+  }
+  .special {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    font-size: 26px;
+  }
+  .arsenal-actions {
+    margin-top: 4px;
+    gap: 4px;
+  }
+  #lock-shot {
+    min-height: 44px;
+    font-size: 18px;
+  }
+  #loadout-label {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .power-overlay,
+  .virtual-controls .power-overlay {
+    left: calc(50% + 157px);
+    right: auto;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    padding: 0;
+    gap: 1px;
+    border: 0;
+    background: transparent;
+  }
+  .power-overlay small {
+    display: none;
+  }
+  .power-overlay b {
+    font-size: 10px;
+  }
+  .hud-own {
+    top: max(4px, env(safe-area-inset-top));
+    left: max(5px, env(safe-area-inset-left));
+    max-width: 32%;
+    padding: 3px;
+  }
+  .hud-own img {
+    width: 45px;
+    height: 36px;
+  }
+  .hud-own b {
+    font-size: 11px;
+  }
+  .hud-own small {
+    font-size: 8px;
+  }
+  .hud-round {
+    top: max(4px, env(safe-area-inset-top));
+    padding: 3px 12px;
+  }
+  .hud-round b {
+    font-size: 21px;
+  }
+  .hud-round small,
+  .hud-round span {
+    font-size: 8px;
+  }
+  .hud-rivals {
+    top: max(4px, env(safe-area-inset-top));
+    right: max(5px, env(safe-area-inset-right));
+    padding: 3px;
+    gap: 4px;
+  }
+  .hud-rivals #rival-hud {
+    max-height: 48px;
+  }
+  #rival-hud > div {
+    min-width: 75px;
+  }
+  .in-battle #combat-message {
+    top: 66px;
+    font-size: 8px;
+    padding: 3px 8px;
+  }
+  .battle-help {
+    display: none;
+  }
+}
+@media (orientation: portrait) and (pointer: coarse),
+  (orientation: portrait) and (max-width: 650px) {
+  .aim-overlay {
+    left: 8px;
+    right: auto;
+    bottom: 175px;
+  }
+  .move-overlay {
+    left: auto;
+    right: 8px;
+    bottom: 175px;
+  }
+  .power-overlay {
+    bottom: 175px;
+    right: calc(50% - 22px);
+  }
+}
+/* Small 568px phones: preserve 44px targets by using a second action row. */
+@media (orientation: landscape) and (max-width: 650px) {
+  .arsenal-overlay {
+    width: 232px;
+    left: 51%;
+  }
+  .arsenal-row {
+    flex-wrap: wrap;
+  }
+  #weapon-grid {
+    flex-basis: 100%;
+  }
+  .arsenal-row > .special {
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+  }
+  .arsenal-actions {
+    margin-right: 48px;
+  }
+  .arsenal-overlay #loadout-label {
+    display: none;
+  }
+  .power-overlay,
+  .virtual-controls .power-overlay {
+    left: auto;
+    right: 8px;
+    bottom: 77px;
+  }
+}
+.super-button {
+  min-width: 60px;
+  min-height: 44px;
+  border: 1px solid #ffce69;
+  border-radius: 10px;
+  color: #ffe6a4;
+  background: #3b2e5088;
+  font-size: 10px;
+  padding: 4px;
+}
+.super-button.selected {
+  background: #80622a99;
+  box-shadow: 0 0 10px #ffce6966;
+}
+#super-target-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+}
+#super-target {
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+}
+@media (orientation: landscape) and (pointer: coarse),
+  (orientation: landscape) and (max-width: 950px) and (max-height: 550px) {
+  .arsenal-row {
+    position: relative;
+    padding-right: 48px;
+  }
+  .arsenal-row .special {
+    position: absolute;
+    right: 0;
+    top: 0;
+  }
+  .super-button {
+    position: absolute;
+    top: 48px;
+    right: 0;
+    min-width: 44px;
+    width: 44px;
+    min-height: 44px;
+    font-size: 8px;
+  }
+  .arsenal-actions {
+    margin-right: 48px;
+  }
+  #super-target-label {
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #14263acc;
+    border-radius: 8px;
+    padding: 0 6px;
+  }
+  #super-target {
+    height: 44px;
+  }
+}
+@media (orientation: landscape) and (max-width: 650px) {
+  .arsenal-row {
+    padding-right: 0;
+  }
+  .arsenal-row .special {
+    top: 48px;
+    right: 0;
+    bottom: auto;
+  }
+  .super-button {
+    top: -48px;
+    right: 0;
+  }
+}
+@media (orientation: landscape) and (max-width: 650px) {
+  .power-overlay,
+  .virtual-controls .power-overlay {
+    left: calc(51% + 124px);
+    right: auto;
+    bottom: max(8px, env(safe-area-inset-bottom));
+  }
+}
+
+/* Final mobile mapping: left aim stick, right movement/power cross. */
+@media (max-width: 650px), (pointer: coarse), (max-width: 950px) and (max-height: 550px) {
+  .aim-overlay .joystick {
+    display: block;
+    width: 96px;
+    height: 96px;
+  }
+  .aim-buttons,
+  .power-overlay,
+  .virtual-controls .power-overlay {
+    display: none;
+  }
+  .movement-buttons {
+    display: grid;
+    grid-template-columns: repeat(3, 44px);
+    grid-template-rows: repeat(3, 44px);
+    gap: 2px;
+  }
+  .pad-power-up {
+    grid-area: 1 / 2;
+  }
+  .pad-move-left {
+    grid-area: 2 / 1;
+  }
+  .pad-move-right {
+    grid-area: 2 / 3;
+  }
+  .pad-power-down {
+    grid-area: 3 / 2;
+  }
+  .pad-power-value {
+    grid-area: 2 / 2;
+    align-self: center;
+    font-size: 11px;
+    color: #ffdb8e;
+  }
+  .aim-overlay {
+    left: max(8px, env(safe-area-inset-left));
+    right: auto;
+  }
+  .move-overlay {
+    left: auto;
+    right: max(8px, env(safe-area-inset-right));
+  }
+}

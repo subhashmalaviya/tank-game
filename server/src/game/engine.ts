@@ -49,6 +49,7 @@ export class Game {
         maxHp: Math.round(def.hp * config.healthMultiplier),
         armor: def.armor,
         energy: 100,
+        superpowerUsed: false,
         cooldown: 0,
         statuses: {},
         moved: 0,

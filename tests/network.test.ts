@@ -70,16 +70,45 @@ describe('Actual Socket.IO multiplayer integration', () => {
     p.b.on('state', (s) => (snapshot = s));
     const submit = await req(p.a, 'command', {
       id: 'sealed-a',
-      command: { type: 'lock', round: 1, angle: 47, power: 63, weapon: 'standard', ability: false },
+      command: {
+        type: 'lock',
+        round: 1,
+        angle: 47,
+        power: 63,
+        weapon: 'standard',
+        ability: false,
+        superpower: true,
+      },
     });
     expect(submit.ok).toBe(true);
+    expect(
+      (
+        await req(p.a, 'command', {
+          id: 'sealed-a',
+          command: {
+            type: 'lock',
+            round: 1,
+            angle: 47,
+            power: 63,
+            weapon: 'standard',
+            ability: false,
+            superpower: true,
+          },
+        })
+      ).ok,
+    ).toBe(false);
     await sleep(40);
     expect(snapshot!.match!.ownPlan).toBeUndefined();
     expect(snapshot!.match!.fighters.find((f) => f.id === p.ar.playerId)!.power).toBe(0);
     expect(snapshot!.match!.shots).toHaveLength(0);
+    expect(snapshot!.match!.superEvents ?? []).toEqual([]);
+    expect(snapshot!.match!.fighters.find((f) => f.id === p.ar.playerId)!.superpowerUsed).toBe(
+      false,
+    );
     const reconnect = await client(),
       resumed = await req(reconnect, 'resume', { code: p.ar.room!.code, token: p.ar.token });
     expect(resumed.room!.match!.ownPlan?.power).toBe(63);
+    expect(resumed.room!.match!.ownPlan?.superpower).toBe(true);
     expect(
       (
         await req(reconnect, 'command', {
@@ -109,6 +138,27 @@ describe('Actual Socket.IO multiplayer integration', () => {
     game.tick(game.state.resolveAt + 1);
     expect(game.state.turn).toBe(2);
     expect(game.state.readyIds).toEqual([]);
+    const again = await client();
+    const restored = await req(again, 'resume', { code: p.ar.room!.code, token: p.ar.token });
+    expect(restored.room!.match!.fighters.find((f) => f.id === p.ar.playerId)!.superpowerUsed).toBe(
+      true,
+    );
+    expect(
+      (
+        await req(again, 'command', {
+          id: 'super-again',
+          command: {
+            type: 'lock',
+            round: 2,
+            angle: 47,
+            power: 63,
+            weapon: 'standard',
+            ability: false,
+            superpower: true,
+          },
+        })
+      ).ok,
+    ).toBe(false);
   });
   it('creates a coded room, joins friends and hides private tokens', async () => {
     const { a, ar, br } = await makePair();

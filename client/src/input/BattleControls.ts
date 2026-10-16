@@ -1,3 +1,4 @@
+import { SUPERPOWERS } from '../../../shared/src/configs/superpowers';
 import type { Command, MatchState } from '../../../shared/src/types';
 import { TANKS } from '../../../shared/src/configs/tanks';
 import { WEAPONS } from '../../../shared/src/configs/weapons';
@@ -30,6 +31,7 @@ export class BattleControls {
   private frame = 0;
   private last = 0;
   private move = 0;
+  private held = new Map<number, string>();
   private movePending = false;
   private moveTime = 0;
   private keys = new Set<string>();
@@ -44,19 +46,28 @@ export class BattleControls {
   power = 65;
   weapon = 'standard';
   ability = false;
+  superpower = false;
+  superTargetX = 720;
   constructor(
     private root: HTMLElement,
     private id: string,
     private send: (c: Command) => Promise<void>,
-    private aim: (a: number, p: number, w: string) => void,
+    private aim: (a: number, p: number, w: string, target?: number) => void,
     private error: (s: string) => void,
     private settings: () => void,
   ) {
-    root.innerHTML = `<div class="hud-own glass-panel" id="pilot-hud"></div><div class="hud-round glass-panel"><small id="turn-label">ROUND 1</small><b id="turn-time">30</b><span id="phase-label">PLANNING</span></div><div class="hud-rivals glass-panel"><div id="rival-hud"></div><button id="battle-settings" aria-label="Battle settings">⚙</button></div><div id="combat-message" aria-live="polite"></div><div class="move-overlay"><div class="joystick" id="move-stick" role="slider" aria-label="Movement joystick" tabindex="0"><span>↔</span><i></i></div><small id="fuel"></small></div><div class="aim-overlay"><div class="joystick" id="aim-stick" role="slider" aria-label="Cannon aiming joystick" tabindex="0"><span>⌖</span><i></i></div><small id="angle-value"></small></div><label class="power-overlay glass-panel"><b id="power-value">65%</b><input aria-label="Shot power" id="battle-power" type="range" min="10" max="100" value="65"><small>POWER</small></label><div class="arsenal-overlay glass-panel"><div class="arsenal-row"><div id="weapon-grid"></div><button id="ability-toggle" class="special" aria-label="Plan special ability">⬡</button></div><div class="arsenal-actions"><button id="expand-inventory" aria-expanded="false" aria-label="Expand weapon inventory">＋</button><button id="lock-shot">LOCK IN SHOT ↗</button></div><small id="loadout-label"></small><select id="repair-target" aria-label="Repair target" hidden></select></div><div class="battle-help">A / D MOVE · DRAG AIM · WHEEL POWER · E ABILITY · SPACE LOCK</div><div class="rotate-hint">↻ Landscape gives you a wider view</div>`;
+    root.innerHTML = `<div class="hud-own glass-panel" id="pilot-hud"></div><div class="hud-round glass-panel"><small id="turn-label">ROUND 1</small><b id="turn-time">30</b><span id="phase-label">PLANNING</span></div><div class="hud-rivals glass-panel"><div id="rival-hud"></div><button id="battle-settings" aria-label="Battle settings">⚙</button></div><div id="combat-message" aria-live="polite"></div><div class="move-overlay"><div class="joystick" id="move-stick" role="slider" aria-label="Movement joystick" tabindex="0"><span>↔</span><i></i></div><div class="direction-buttons movement-buttons"><button class="pad-power-up" data-hold="power:1" aria-label="Increase power">▲</button><b class="pad-power-value" data-power-label>65%</b><button class="pad-power-down" data-hold="power:-1" aria-label="Decrease power">▼</button><button class="pad-move-left" data-hold="move:-1" aria-label="Move left">◀</button><button class="pad-move-right" data-hold="move:1" aria-label="Move right">▶</button></div><small id="fuel"></small></div><div class="aim-overlay"><div class="joystick" id="aim-stick" role="slider" aria-label="Cannon aiming joystick" tabindex="0"><span>⌖</span><i></i></div><div class="direction-buttons aim-buttons"><button data-hold="aim:2" aria-label="Aim up">▲</button><button data-hold="aim:-1" aria-label="Aim left">◀</button><button data-hold="aim:1" aria-label="Aim right">▶</button><button data-hold="aim:-2" aria-label="Aim down">▼</button></div><small id="angle-value"></small></div><label class="power-overlay glass-panel"><b id="power-value">65%</b><input aria-label="Shot power" id="battle-power" type="range" min="10" max="100" value="65"><div class="direction-buttons power-buttons"><button data-hold="power:1" aria-label="Increase power">+</button><button data-hold="power:-1" aria-label="Decrease power">−</button></div><small>POWER</small></label><div class="arsenal-overlay glass-panel"><div class="arsenal-row"><div id="weapon-grid"></div><button id="ability-toggle" class="special" aria-label="Plan special ability">⬡</button><button id="super-toggle" class="super-button" aria-label="Queue signature superpower"></button></div><label id="super-target-label" hidden>Target <input id="super-target" aria-label="Superpower target location" type="range" min="30" max="1410" step="4"><output id="super-target-value"></output></label><div class="arsenal-actions"><button id="expand-inventory" aria-expanded="false" aria-label="Expand weapon inventory">＋</button><button id="lock-shot">LOCK IN SHOT ↗</button></div><small id="loadout-label"></small><select id="repair-target" aria-label="Repair target" hidden></select></div><div class="battle-help">A / D MOVE · DRAG AIM · WHEEL POWER · E ABILITY · Q SUPER · SPACE LOCK</div><div class="rotate-hint">↻ Landscape gives you a wider view</div>`;
     const on = (el: EventTarget, type: string, fn: EventListener) =>
       el.addEventListener(type, fn, { signal: this.abort.signal });
     on(root.querySelector('#battle-settings')!, 'click', () => settings());
     on(root.querySelector('#lock-shot')!, 'click', () => void this.lock());
+    on(root.querySelector('#super-toggle')!, 'click', () => this.toggleSuper());
+    on(root.querySelector('#super-target')!, 'input', (e) => {
+      if (this.allowed()) {
+        this.superTargetX = Number((e.target as HTMLInputElement).value);
+        this.sync();
+      }
+    });
     on(root.querySelector('#ability-toggle')!, 'click', () => this.toggleAbility());
     on(root.querySelector('#expand-inventory')!, 'click', () => {
       root.classList.toggle('inventory-open');
@@ -77,6 +88,7 @@ export class BattleControls {
         this.sync();
       }
     });
+    this.bindButtons();
     this.stick('move-stick', (x) => {
       this.move = Math.abs(x) > 0.15 ? x : 0;
     });
@@ -106,6 +118,7 @@ export class BattleControls {
       if (k.repeat) return;
       if (key === ' ') void this.lock();
       if (key === 'e') this.toggleAbility();
+      if (key === 'q') this.toggleSuper();
       const n = Number(key) - 1;
       if (n >= 0 && n < 9) {
         const b = root.querySelectorAll<HTMLButtonElement>('[data-weapon]')[n];
@@ -118,6 +131,7 @@ export class BattleControls {
     on(window, 'keyup', (e) => this.keys.delete((e as KeyboardEvent).key.toLowerCase()));
     on(window, 'blur', () => {
       this.keys.clear();
+      this.held.clear();
       this.move = 0;
     });
     this.frame = requestAnimationFrame((t) => this.tick(t));
@@ -212,6 +226,50 @@ export class BattleControls {
         { signal: this.abort.signal },
       );
   }
+  private bindButtons() {
+    for (const button of this.root.querySelectorAll<HTMLButtonElement>('[data-hold]')) {
+      button.addEventListener(
+        'pointerdown',
+        (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!this.allowed()) return;
+          button.setPointerCapture(e.pointerId);
+          this.held.set(e.pointerId, button.dataset.hold!);
+          const [kind, value] = button.dataset.hold!.split(':');
+          if (kind === 'move')
+            void this.execute({ type: 'move', direction: Number(value) as -1 | 1, distance: 2 });
+          if (kind === 'aim') this.angle = Math.max(5, Math.min(175, this.angle + Number(value)));
+          if (kind === 'power')
+            this.power = Math.max(10, Math.min(100, this.power + Number(value)));
+          this.sync();
+        },
+        { signal: this.abort.signal },
+      );
+      for (const type of ['pointerup', 'pointercancel', 'lostpointercapture'])
+        button.addEventListener(
+          type,
+          (e) => {
+            this.held.delete((e as PointerEvent).pointerId);
+          },
+          { signal: this.abort.signal },
+        );
+      button.addEventListener(
+        'click',
+        (e) => {
+          if (e.detail !== 0 || !this.allowed()) return;
+          const [kind, value] = button.dataset.hold!.split(':');
+          if (kind === 'move')
+            void this.execute({ type: 'move', direction: Number(value) as -1 | 1, distance: 2 });
+          if (kind === 'aim') this.angle = Math.max(5, Math.min(175, this.angle + Number(value)));
+          if (kind === 'power')
+            this.power = Math.max(10, Math.min(100, this.power + Number(value)));
+          this.sync();
+        },
+        { signal: this.abort.signal },
+      );
+    }
+  }
   private allowed() {
     const s = this.state,
       f = s?.fighters.find((f) => f.id === this.id);
@@ -234,6 +292,7 @@ export class BattleControls {
       await this.send(c);
     } catch (e) {
       if (c.type === 'move') {
+        this.held.clear();
         this.move = 0;
         this.keys.clear();
       }
@@ -242,6 +301,8 @@ export class BattleControls {
   }
   private async lock() {
     if (!this.allowed()) return;
+    this.held.clear();
+    this.move = 0;
     this.pending = true;
     this.refresh();
     await this.execute(
@@ -253,6 +314,8 @@ export class BattleControls {
             power: this.power,
             weapon: this.weapon,
             ability: this.ability,
+            superpower: this.superpower,
+            ...(this.superpower ? { superTargetX: this.superTargetX } : {}),
             ...(this.root.querySelector<HTMLSelectElement>('#repair-target')!.value
               ? { targetId: this.root.querySelector<HTMLSelectElement>('#repair-target')!.value }
               : {}),
@@ -260,6 +323,13 @@ export class BattleControls {
         : { type: 'fire', angle: this.angle, power: this.power, weapon: this.weapon },
     );
     this.pending = false;
+    this.refresh();
+  }
+  private toggleSuper() {
+    const f = this.state?.fighters.find((f) => f.id === this.id);
+    if (!this.allowed() || !this.state?.phase || !f || f.superpowerUsed || f.statuses.emp) return;
+    this.superpower = !this.superpower;
+    this.sync();
     this.refresh();
   }
   private toggleAbility() {
@@ -291,6 +361,8 @@ export class BattleControls {
       this.power = 65;
       this.weapon = TANKS[me.tank].weapon;
       this.ability = false;
+      this.superpower = false;
+      this.superTargetX = Math.max(30, Math.min(1410, me.x));
       if (me.weapons[this.weapon]?.cooldown) this.weapon = 'standard';
     }
     if (s.ownPlan) {
@@ -298,7 +370,14 @@ export class BattleControls {
       this.power = s.ownPlan.power;
       this.weapon = s.ownPlan.weapon;
       this.ability = s.ownPlan.ability;
+      this.superpower = !!s.ownPlan.superpower;
+      this.superTargetX = s.ownPlan.superTargetX ?? me.x;
     }
+    if (!s.ownPlan)
+      this.superTargetX = Math.max(
+        Math.max(30, me.x - SUPERPOWERS[me.tank].range),
+        Math.min(Math.min(1410, me.x + SUPERPOWERS[me.tank].range), this.superTargetX),
+      );
     this.root.querySelector('#pilot-hud')!.innerHTML =
       `<img src="${tankArt(me.tank)}" alt="${TANKS[me.tank].name}"><div><b>${safe(me.name)}</b><small>${TANKS[me.tank].name} · <span data-health-id="${me.id}">${me.hp}/${me.maxHp} HP</span></small><meter data-meter-id="${me.id}" min="0" max="${me.maxHp}" value="${me.hp}"></meter><small>ϟ ${me.energy} · ${me.cooldown ? 'ABILITY ' + me.cooldown + 'R' : TANKS[me.tank].ability.name} ${Object.entries(
         me.statuses,
@@ -363,7 +442,30 @@ export class BattleControls {
           : s.phase
             ? 'LOCK IN SHOT ↗'
             : 'FIRE ↗';
+    const superButton = this.root.querySelector<HTMLButtonElement>('#super-toggle')!;
+    const def = SUPERPOWERS[me.tank];
+    const superState = me.superpowerUsed
+      ? 'USED'
+      : this.superpower
+        ? 'PENDING'
+        : !can || !!me.statuses.emp || !s.phase
+          ? 'DISABLED'
+          : 'READY';
+    superButton.textContent = def.icon + ' ' + superState;
+    superButton.title = def.name + ' — ' + def.description + ' (once per match; Q)';
+    superButton.setAttribute('aria-label', def.name + ' ' + superState);
+    superButton.disabled = !!me.superpowerUsed || !can || !!me.statuses.emp || !s.phase;
+    superButton.classList.toggle('selected', this.superpower && !me.superpowerUsed);
+    const target = this.root.querySelector<HTMLInputElement>('#super-target')!;
+    target.min = String(Math.max(30, me.x - def.range));
+    target.max = String(Math.min(1410, me.x + def.range));
+    target.disabled = !can;
+    this.root.querySelector<HTMLElement>('#super-target-label')!.hidden =
+      !this.superpower ||
+      !!me.superpowerUsed ||
+      !['phantom', 'inferno', 'viper', 'quake', 'nova'].includes(me.tank);
     this.root.classList.toggle('locked', !can);
+    for (const b of this.root.querySelectorAll<HTMLButtonElement>('[data-hold]')) b.disabled = !can;
     this.root.querySelector<HTMLButtonElement>('#ability-toggle')!.disabled =
       !can || !!me.cooldown || !!me.statuses.emp || me.energy < TANKS[me.tank].ability.cost;
     this.root.querySelector<HTMLButtonElement>('#ability-toggle')!.title =
@@ -385,6 +487,7 @@ export class BattleControls {
   private sync() {
     this.root.querySelector('#angle-value')!.textContent = Math.round(this.angle) + '° AIM';
     this.root.querySelector('#power-value')!.textContent = Math.round(this.power) + '%';
+    this.root.querySelector('[data-power-label]')!.textContent = Math.round(this.power) + '%';
     this.root.querySelector<HTMLInputElement>('#battle-power')!.value = String(this.power);
     for (const b of this.root.querySelectorAll<HTMLElement>('[data-weapon]')) {
       b.classList.toggle('selected', b.dataset.weapon === this.weapon);
@@ -394,7 +497,10 @@ export class BattleControls {
     this.root.querySelector('#ability-toggle')!.setAttribute('aria-pressed', String(this.ability));
     this.root.querySelector('#loadout-label')!.textContent =
       WEAPONS[this.weapon].name + (this.ability ? ' + SPECIAL QUEUED' : '');
-    this.aim(this.angle, this.power, this.weapon);
+    this.root.querySelector<HTMLInputElement>('#super-target')!.value = String(this.superTargetX);
+    this.root.querySelector('#super-target-value')!.textContent =
+      Math.round(this.superTargetX) + 'm';
+    this.aim(this.angle, this.power, this.weapon, this.superpower ? this.superTargetX : undefined);
   }
   private tick(t: number) {
     const dt = Math.min(0.05, (t - this.last) / 1000 || 0);
@@ -426,7 +532,19 @@ export class BattleControls {
       this.refresh();
     }
     if (allowed) {
+      const heldValue = (kind: string) =>
+        [...this.held.values()]
+          .filter((v) => v.startsWith(kind + ':'))
+          .reduce((sum, v) => sum + Number(v.split(':')[1]), 0);
+      const aimStep = heldValue('aim'),
+        powerStep = heldValue('power');
+      if (aimStep || powerStep) {
+        this.angle = Math.max(5, Math.min(175, this.angle + aimStep * dt * 24));
+        this.power = Math.max(10, Math.min(100, this.power + powerStep * dt * 25));
+        this.sync();
+      }
       const direction =
+        heldValue('move') ||
         this.move ||
         (this.keys.has('a') || this.keys.has('arrowleft')
           ? -1
@@ -457,6 +575,7 @@ export class BattleControls {
       }
     } else {
       this.move = 0;
+      this.held.clear();
       this.keys.clear();
     }
     this.frame = requestAnimationFrame((v) => this.tick(v));

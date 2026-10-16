@@ -3,7 +3,14 @@ import { coverAt } from '../maps/environment';
 import type { Environment } from '../types';
 import { HEIGHT, WIDTH, Terrain } from '../maps/terrain';
 import type { Fighter, Point, Weapon } from '../types';
+export interface ReflectionShield {
+  remaining: number;
+  facing: number;
+  directional: boolean;
+}
 export interface Flight {
+  reflections?: { x: number; y: number; defender: string }[];
+  reflectedBy?: string;
   path: Point[];
   impact: Point;
   directId?: string;
@@ -22,6 +29,8 @@ export function projectile(
   ownerId: string,
   teamMode = false,
   environment?: Environment,
+  shields?: Map<string, ReflectionShield>,
+  guidedTargetId?: string,
 ): Flight {
   const rad = (angle * Math.PI) / 180,
     speed = (weapon.speed * power) / 100;
@@ -32,15 +41,20 @@ export function projectile(
     bounces = 0,
     pierced = false;
   const path: Point[] = [{ x, y }];
+  const reflections: { x: number; y: number; defender: string }[] = [];
+  let reflectedBy: string | undefined;
+  let reflectionTick = -1;
+  const reflectionResult = () => ({ reflections, reflectedBy });
   for (let i = 0; i < 1200; i++) {
     if (weapon.behavior === 'guided' && i > 30) {
       const target = fighters
         .filter(
           (t) =>
-            t.id !== ownerId &&
+            (reflectedBy ? t.id === ownerId : !guidedTargetId || t.id === guidedTargetId) &&
+            t.id !== (reflectedBy ?? ownerId) &&
             t.hp > 0 &&
             !t.statuses.cloak &&
-            (!teamMode || t.team !== fighters.find((f) => f.id === ownerId)?.team),
+            (!teamMode || t.team !== fighters.find((f) => f.id === (reflectedBy ?? ownerId))?.team),
         )
         .sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y))[0];
       if (target) {
@@ -63,12 +77,51 @@ export function projectile(
     for (let j = 1; j <= steps; j++) {
       const px = x + ((nx - x) * j) / steps,
         py = y + ((ny - y) * j) / steps;
+      if (!reflectedBy && shields && weapon.behavior !== 'pierce') {
+        const defender = fighters.find((t) => {
+          const shield = shields.get(t.id);
+          const attacker = fighters.find((f) => f.id === ownerId);
+          return (
+            shield &&
+            shield.remaining > 0 &&
+            t.hp > 0 &&
+            t.id !== ownerId &&
+            (!teamMode || t.team !== attacker?.team) &&
+            Math.hypot(px - t.x, py - t.y) < 42 &&
+            (!shield.directional || (px - t.x) * shield.facing >= 0) &&
+            (px - t.x) * vx + (py - t.y) * vy < 0
+          );
+        });
+        if (defender) {
+          shields.get(defender.id)!.remaining--;
+          reflectedBy = defender.id;
+          reflectionTick = i;
+          reflections.push({ x: px, y: py, defender: defender.id });
+          path.push({ x: px, y: py });
+          // Specular reflection around the shield surface normal; only one reflection per projectile.
+          const length = Math.max(1, Math.hypot(px - defender.x, py - defender.y));
+          const normalX = (px - defender.x) / length,
+            normalY = (py - defender.y) / length;
+          const dot = vx * normalX + vy * normalY;
+          vx -= 2 * dot * normalX;
+          vy -= 2 * dot * normalY;
+          x = px + normalX * 4;
+          y = py + normalY * 4;
+          bounced = true;
+          break;
+        }
+      }
       const target = fighters.find(
-        (t) => t.hp > 0 && (t.id !== ownerId || i > 12) && tankContains(t, px, py),
+        (t) =>
+          t.hp > 0 &&
+          (t.id !== reflectedBy || i - reflectionTick > 6) &&
+          (t.id !== ownerId || i > 12 || !!reflectedBy) &&
+          tankContains(t, px, py),
       );
       if (target) {
         path.push({ x: px, y: py });
         return {
+          ...reflectionResult(),
           path,
           impact: { x: px, y: py },
           directId: target.id,
@@ -80,6 +133,7 @@ export function projectile(
       if (cover) {
         path.push({ x: px, y: py });
         return {
+          ...reflectionResult(),
           path,
           impact: { x: px, y: py },
           hit: true,
@@ -103,7 +157,13 @@ export function projectile(
           continue;
         }
         path.push({ x: px, y: py });
-        return { path, impact: { x: px, y: py }, hit: true, durationMs: ((i + 1) * 1000) / 60 };
+        return {
+          ...reflectionResult(),
+          path,
+          impact: { x: px, y: py },
+          hit: true,
+          durationMs: ((i + 1) * 1000) / 60,
+        };
       }
     }
     if (bounced) continue;
@@ -112,10 +172,22 @@ export function projectile(
     if (i % 3 === 0) path.push({ x, y });
     if (x < -80 || x > WIDTH + 80 || y > HEIGHT + 80) {
       path.push({ x, y });
-      return { path, impact: { x, y }, hit: false, durationMs: path.length * 50 };
+      return {
+        ...reflectionResult(),
+        path,
+        impact: { x, y },
+        hit: false,
+        durationMs: path.length * 50,
+      };
     }
   }
-  return { path, impact: { x, y }, hit: false, durationMs: path.length * 50 };
+  return {
+    ...reflectionResult(),
+    path,
+    impact: { x, y },
+    hit: false,
+    durationMs: path.length * 50,
+  };
 }
 export function preview(
   origin: Point,

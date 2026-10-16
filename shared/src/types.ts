@@ -106,6 +106,7 @@ export interface Fighter extends LobbyPlayer {
   cooldown: number;
   statuses: Partial<Record<Status, number>>;
   moved: number;
+  superpowerUsed?: boolean;
   weapons: Record<string, { ammo: number; cooldown: number }>;
   stats: { damage: number; shots: number; hits: number; kills: number };
   angle: number;
@@ -135,6 +136,7 @@ export interface Shot {
   launchMs?: number;
   impactMs?: number;
   hit?: boolean;
+  reflections?: { x: number; y: number; defender: string }[];
   terrainRadius?: number;
   damage: { id: string; amount: number; absorbed?: number; x: number; y: number }[];
 }
@@ -163,6 +165,7 @@ export interface MatchState {
   resolutionStart?: { id: string; hp: number; shield: number }[];
   environment?: Environment;
   abilityEvents?: AbilityEvent[];
+  superEvents?: SuperEvent[];
   seed: number;
   map: string;
   fighters: Fighter[];
@@ -196,6 +199,8 @@ export interface Plan {
   weapon: string;
   ability: boolean;
   targetId?: string;
+  superpower?: boolean;
+  superTargetX?: number;
   pass?: boolean;
 }
 export interface AbilityEvent {
@@ -235,4 +240,16 @@ export interface Reply {
   room?: RoomState;
   playerId?: string;
   token?: string;
+}
+
+export interface SuperEvent {
+  cancelled?: boolean;
+  owner: string;
+  tank: TankId;
+  from: Point;
+  to: Point;
+  path: Point[];
+  targets: (Point & { id?: string })[];
+  facing?: number;
+  durationMs: number;
 }
